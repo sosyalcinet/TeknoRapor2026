@@ -1,55 +1,83 @@
 import streamlit as st
 import google.generativeai as genai
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from fpdf import FPDF
+import urllib.parse
 from datetime import datetime
 
-# --- KİMLİK BİLGİLERİ ---
-GEMINI_API_KEY = "AIzaSyAE8lRdc5kvG2Bu-DbNNdrtqbO-CUrb7WM" 
-SHEET_ID = "1XSgC6lLDcuHjJ2eyj-bkIuoWW9bvulp4yo_SqeiVxL4"
-JSON_FILE = "teknorapor2026-75e526daaee5.json"
+# --- GÜVENLİK VE AYARLAR ---
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
-# --- SAYFA TASARIMI ---
+# --- ARAYÜZ ---
 st.set_page_config(page_title="TeknoRapor Asistanı Derepazarı", layout="centered")
 
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🚀 TeknoRapor Asistanı Derepazarı</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center;'>İlçe Milli Eğitim Müdürlüğü | Arge Birimi 2026</h3>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>🚀 TeknoRapor Asistanı Derepazarı</h1>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: gray;'>İlçe Milli Eğitim Müdürlüğü | Arge Birimi 2026</h3>", unsafe_allow_html=True)
 
-# Proje Bilgileri
+# Formu Sıfırlama Fonksiyonu (Tekrar Hazırla için)
+if 'rapor_hazir' not in st.session_state:
+    st.session_state.rapor_hazir = False
+    st.session_state.rapor_metni = ""
+
+# Giriş Alanları
 seviye = st.selectbox("Eğitim Seviyesi", ["İlkokul", "Ortaokul", "Lise"])
-proje_adi = st.text_input("Proje Adı", value="BULUT KUMBARASI: Gökten İnen Bereket")
-ham_fikir = st.text_area("Projenizin ana fikri nedir?", value="Rize'nin yağmurlarını depolayıp bahçelerde kullanan akıllı bir kumbara sistemi.")
-insan_dokunusu = st.text_area("Kişisel Gözlem", value="Rize merkezde su kesintileri ve yağmurun israfı bu fikri doğurdu.")
+proje_adi = st.text_input("Proje Adı")
+ham_fikir = st.text_area("Projenizin ana fikri nedir?")
+insan_dokunusu = st.text_area("Kişisel Gözleminiz")
 
-if st.button("Raporu Hemen Hazırla"):
-    with st.spinner("Sistem hesabınızdaki en uygun modeli (Gemini 3 veya 1.5) seçiyor..."):
-        try:
-            genai.configure(api_key=GEMINI_API_KEY)
-            
-            # --- MODELİ OTOMATİK BULAN SİHİRLİ KISIM ---
-            model_list = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            # Listeden en güncel olanı (genellikle ilk sıradakini) seçer
-            active_model_name = model_list[0] if model_list else "models/gemini-1.5-flash"
-            
-            model = genai.GenerativeModel(active_model_name)
-            
-            prompt = f"""
-            Sen bir Teknofest uzmanısın. {seviye} seviyesi için akademik dille ÖDR yaz.
-            KURALLAR:
-            1. Proje Özeti: Kesinlikle 150-250 kelime arasında olmalı.
-            2. Yazı Tipi: Arial 12 ve 1.15 satır aralığına uygun kurgula.
-            3. Bölümler: Özet, Problem Tanımı, Çözüm Önerisi, Özgün Değer, Uygulanabilirlik.
-            4. İçerik: {proje_adi} projesini {ham_fikir} ve '{insan_dokunusu}' üzerinden detaylandır.
-            """
-            
-            response = model.generate_content(prompt)
-            st.success(f"Başarı! ({active_model_name} modeliyle rapor üretildi)")
-            st.markdown("### 📄 Raporunuz Hazır")
-            st.write(response.text)
-            
-        except Exception as e:
-            st.error(f"Teknik bir sorun: {str(e)}. Lütfen API anahtarınızı AI Studio'dan tekrar kontrol edin.")
+col1, col2 = st.columns(2)
 
+with col1:
+    if st.button("Raporu Hazırla"):
+        if not ham_fikir or not proje_adi:
+            st.error("Lütfen alanları doldurun.")
+        else:
+            with st.spinner("Rapor oluşturuluyor..."):
+                genai.configure(api_key=GEMINI_API_KEY)
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                
+                prompt = f"""
+                Sen bir Teknofest uzmanısın. {seviye} seviyesi için ÖDR yaz.
+                KURALLAR: 150-250 kelime özet, Arial 12 ve 1.15 aralık yapısı.
+                İçerik: {proje_adi} - {ham_fikir}. Özgünlük hikayesi: {insan_dokunusu}.
+                """
+                
+                response = model.generate_content(prompt)
+                st.session_state.rapor_metni = response.text
+                st.session_state.rapor_hazir = True
+
+with col2:
+    if st.button("Formu Temizle (Yeniden Başla)"):
+        st.session_state.rapor_hazir = False
+        st.session_state.rapor_metni = ""
+        st.rerun()
+
+# --- RAPOR HAZIRLANDIKTAN SONRA ÇIKACAK SEÇENEKLER ---
+if st.session_state.rapor_hazir:
+    st.markdown("---")
+    st.success("✅ Raporunuz Başarıyla Hazırlandı!")
+    st.text_area("Hazırlanan Metin (Buradan kopyalayabilirsiniz):", st.session_state.rapor_metni, height=300)
+
+    st.markdown("### 📤 Raporu Paylaş veya Gönder")
+    
+    # Paylaşım metnini internet adresine uygun hale getirme
+    paylasim_metni = urllib.parse.quote(f"TeknoRapor Asistanı ile hazırladığım rapor:\n\n{st.session_state.rapor_metni}")
+
+    c1, c2, c3 = st.columns(3)
+    
+    with c1:
+        # WhatsApp Paylaş
+        wa_link = f"https://wa.me/?text={paylasim_metni}"
+        st.markdown(f"[![WhatsApp](https://img.shields.io/badge/WhatsApp-Paylaş-25D366?style=for-the-badge&logo=whatsapp)]({wa_link})")
+
+    with c2:
+        # Telegram Paylaş
+        tg_link = f"https://t.me/share/url?url=TeknoRapor&text={paylasim_metni}"
+        st.markdown(f"[![Telegram](https://img.shields.io/badge/Telegram-Paylaş-26A5E4?style=for-the-badge&logo=telegram)]({tg_link})")
+
+    with c3:
+        # E-posta için hazır link (Mailto)
+        mail_link = f"mailto:?subject={proje_adi} Raporu&body={paylasim_metni}"
+        st.markdown(f"[![Email](https://img.shields.io/badge/E--Posta-Gönder-D14836?style=for-the-badge&logo=gmail)]({mail_link})")
+
+# Footer
 st.markdown("---")
-st.markdown("<p style='text-align: center;'>Derepazarı İlçe MEM Arge Birimi 2026 | <a href='https://wa.me/905062840001'>WhatsApp</a></p>", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align: center;'>Derepazarı İlçe MEM Arge Birimi 2026<br>Destek: +905062840001</p>", unsafe_allow_html=True)
