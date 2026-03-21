@@ -145,4 +145,4 @@ if st.button("Teknofest Standartlarında Kapsamlı Raporu Hazırla", use_contain
                 st.error(f"Teknik bir pürüz: {str(e)}")
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: gray;'>Derepazarı İlçe MEM Arge Birimi © 2026</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray;'>Derepazarı İlçe MEM H.KAYMAKÇI © 2026</p>", unsafe_allow_html=True)
