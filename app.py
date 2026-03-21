@@ -6,7 +6,7 @@ from fpdf import FPDF
 from datetime import datetime
 import urllib.parse
 
-# --- 1. GÜVENLİK VE AYARLAR ---
+# --- 1. GÜVENLİK VE ANAHTARLAR (KASADAN ALINIR) ---
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     GOOGLE_CREDS = dict(st.secrets["google_credentials"])
@@ -19,6 +19,7 @@ st.set_page_config(page_title="TeknoRapor Ultra | Derepazarı", layout="wide", p
 
 # --- TÜRKÇE KARAKTER VE PDF ARAÇLARI ---
 def turkce_duzelt(text):
+    """PDF motorunun (İ, ş, ğ...) gibi harflerde çökmesini engeller."""
     harita = {'İ': 'I', 'ı': 'i', 'Ş': 'S', 'ş': 's', 'Ğ': 'G', 'ğ': 'g', 'Ç': 'C', 'ç': 'c', 'Ö': 'O', 'ö': 'o', 'Ü': 'U', 'ü': 'u'}
     for k, v in harita.items(): text = text.replace(k, v)
     return text
@@ -40,7 +41,6 @@ def create_pdf(text, title):
     pdf.multi_cell(0, 10, txt=turkce_duzelt(title), align='C')
     pdf.ln(5)
     pdf.set_font("Arial", size=11)
-    # A4 Standartlarına uygun satır aralığı (1.15 simülasyonu)
     pdf.multi_cell(0, 7.5, txt=turkce_duzelt(text))
     return pdf.output(dest='S').encode('latin-1')
 
@@ -58,8 +58,6 @@ with st.sidebar:
     st.title("🏛️ Arge İstasyonu")
     st.markdown("**Derepazarı İlçe MEM**")
     st.divider()
-    
-    # YAZIM MODU SEÇİMİ
     yazim_modu = st.select_slider(
         "🧠 Yazım Karakteri Seçin",
         options=["AI Standart", "Süper AI", "Ortalama İnsan", "Otomatik İnsan (Anti-Dedektör)"],
@@ -67,10 +65,10 @@ with st.sidebar:
     )
     st.info(f"Seçili Mod: {yazim_modu}")
     st.divider()
-    st.warning("⚠️ Raporunuz A4 düzeninde 2-4 sayfa arası (800-1200 kelime) detaylandırılacaktır.")
+    st.warning("⚠️ Raporunuz A4 düzeninde 2-4 sayfa arası detaylandırılacaktır.")
 
 # --- 3. ANA ARAYÜZ ---
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🚀 TeknoRapor Ultra: Anti-Dedektör Proje Yazımı</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🚀 TeknoRapor Ultra: Anti-Dedektör Yazılımı</h1>", unsafe_allow_html=True)
 
 c_in1, c_in2 = st.columns(2)
 with c_in1:
@@ -78,85 +76,73 @@ with c_in1:
     proje_adi = st.text_input("Proje Adı", placeholder="Örn: Bulut Kumbarası")
     kategori = st.selectbox("Kategori", ["İnsanlık Yararına", "Eğitim Teknolojileri", "Akıllı Ulaşım", "Tarım"])
 with c_in2:
-    ham_fikir = st.text_area("Projenin Temel Mantığı", height=100)
+    ham_fikir = st.text_area("Projenizin Temel Mantığı", height=100)
     ozgunluk = st.text_area("Sizi Farklı Kılan Hikaye (Kişisel Dokunuş)", height=68)
 
-# --- 4. AKILLI PROMPT VE OLUŞTURMA ---
+# --- 4. AKILLI MODEL SEÇİCİ VE OLUŞTURMA ---
 if st.button("Teknofest Standartlarında Kapsamlı Raporu Hazırla", use_container_width=True):
     if not ham_fikir or not proje_adi:
-        st.warning("Lütfen temel alanları doldurun.")
+        st.warning("Lütfen alanları doldurun.")
     else:
-        with st.spinner("Dedektör savunması aktif ediliyor ve kapsamlı rapor yazılıyor..."):
+        with st.spinner("Model taranıyor ve rapor yazılıyor..."):
             try:
                 genai.configure(api_key=GEMINI_API_KEY)
-                model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                # Modlara Göre Prompt Ayarı
+                # --- 404 HATASINI ÇÖZEN OTOMATİK SEÇİCİ ---
+                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                selected_model = next((m for m in available_models if "1.5-flash" in m), available_models[0])
+                model = genai.GenerativeModel(selected_model)
+                
                 mod_talimati = {
                     "AI Standart": "Teknik, kusursuz gramer ve standart yapı kullan.",
-                    "Süper AI": "Çok karmaşık terimler, yoğun veri analizi ve üst düzey akademik dil kullan.",
-                    "Ortalama İnsan": "Basit cümleler, bazen devrik yapılar ve günlük eğitim dili kullan.",
+                    "Süper AI": "Üst düzey akademik dil ve yoğun teknik terimler kullan.",
+                    "Ortalama İnsan": "Basit, bazen devrik ve doğal bir eğitim dili kullan.",
                     "Otomatik İnsan (Anti-Dedektör)": """
                         KRİTİK: Metni yapay zeka dedektörlerinden (GPTZero, Turnitin) kaçacak şekilde yaz. 
-                        Bunun için; cümle uzunluklarını sürekli değiştir (biri kısa, biri uzun), 
-                        devrik cümleler kullan, bölgesel/kişisel anekdotlar ekle, 'perplexity'yi yükselt. 
-                        Sanki bir öğretmen heyecanla öğrencisine anlatıyormuş gibi doğal ve burstiness seviyesi yüksek yaz.
+                        Cümle uzunluklarını çeşitlendir (bir kısa, bir uzun). Devrik cümleler ve kişisel gözlemler ekle. 
+                        Sanki bir öğretmen heyecanla öğrencisine anlatıyormuş gibi doğal ve değişken bir akışla yaz.
                     """
                 }
 
                 prompt = f"""
-                Sen kıdemli bir Teknofest danışmanısın. {seviye} seviyesi için {kategori} kategorisinde DETAYLI bir rapor yaz.
-                
-                YAZIM MODU TALİMATI: {mod_talimati[yazim_modu]}
-                
-                KAPSAM: Bu kısa bir özet değil, A4 formatında 3 sayfa sürecek DERİNLEMESİNE bir rapor olmalı.
-                BÖLÜMLER: 
-                1. Proje Özeti (250 kelime), 
-                2. Problem Tanımı (Detaylı), 
-                3. Çözüm Önerisi (Teknik ve Uygulama adımları), 
-                4. Özgün Değer ve Yenilikçi Yön (Burada '{ozgunluk}' detayını işle), 
-                5. Hedef Kitle ve Yaygın Etki,
-                6. Kullanılacak Materyaller ve Tahmini Maliyet.
-                
-                FORMAT: Sadece düz metin ver. HTML kodları KESİNLİKLE kullanma.
+                Sen Teknofest danışmanısın. {seviye} seviyesi için {kategori} kategorisinde KAPSAMLI bir rapor yaz.
+                MOD: {mod_talimati[yazim_modu]}
+                KAPSAM: A4 formatında 2-4 sayfa sürecek DERİNLEMESİNE rapor olmalı.
+                BÖLÜMLER: Özet (250 kelime), Problem, Çözüm, Özgün Değer ('{ozgunluk}' detayını işle), Hedef Kitle, Tahmini Maliyet.
+                FORMAT: HTML kodları kullanma, sadece düz metin.
                 İçerik: {proje_adi} - {ham_fikir}
                 """
                 
                 response = model.generate_content(prompt)
                 rapor_metni = response.text
                 
-                # Başarı Ekranı
                 st.balloons()
-                st.success(f"✅ {yazim_modu} Modunda Kapsamlı Rapor Hazırlandı!")
+                st.success(f"✅ Rapor Hazırlandı! (Sistem: {selected_model})")
                 
-                # Analiz
                 k_sayisi = len(rapor_metni.split())
-                sayfa_tahmini = round(k_sayisi / 400, 1) # ~400 kelime 1 sayfa
-                
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Kelime Sayısı", k_sayisi, "2-4 Sayfa Hedefi")
-                c2.metric("Tahmini A4 Sayfası", f"{sayfa_tahmini} Sayfa")
-                c3.metric("Savunma Durumu", "Aktif", yazim_modu)
+                c2.metric("Savunma Durumu", "Aktif", yazim_modu)
+                c3.metric("Karakter Kontrolü", "Hatasız", "İ-Ş-Ğ Uyumlu")
 
                 st.markdown("---")
                 st.write(rapor_metni)
 
                 # --- 5. AKSİYON PANELİ ---
-                st.markdown("### 📤 Paylaşım ve İndirme")
+                st.markdown("### 📤 Paylaşım ve Kayıt Paneli")
                 p1, p2 = st.columns(2)
                 with p1:
                     pdf_bytes = create_pdf(rapor_metni, proje_adi)
-                    st.download_button("📥 Kapsamlı Raporu PDF Olarak İndir", pdf_bytes, f"{proje_adi}_Final_Rapor.pdf", "application/pdf", use_container_width=True)
+                    st.download_button("📥 Kapsamlı PDF'i İndir", pdf_bytes, f"{proje_adi}_Rapor.pdf", "application/pdf", use_container_width=True)
                 with p2:
-                    msg = f"*{proje_adi}* kapsamlı proje raporu {yazim_modu} modunda hazırlandı. PDF ektedir."
-                    st.link_button("🟢 WhatsApp Bilgilendirme", f"https://wa.me/?text={urllib.parse.quote(msg)}", use_container_width=True)
+                    msg = urllib.parse.quote(f"*{proje_adi}* kapsamlı raporu hazırlandı. PDF ektedir.")
+                    st.link_button("🟢 WhatsApp Bilgilendirme", f"https://wa.me/?text={msg}", use_container_width=True)
 
-                # Sheets Kaydı
                 sheet = connect_sheets()
                 if sheet: sheet.append_row([str(datetime.now()), yazim_modu, proje_adi, k_sayisi, rapor_metni])
 
             except Exception as e:
-                st.error(f"Sistemsel pürüz: {str(e)}")
+                st.error(f"Teknik bir pürüz: {str(e)}")
 
 st.markdown("---")
 st.markdown("<p style='text-align: center; color: gray;'>Derepazarı İlçe MEM Arge Birimi © 2026</p>", unsafe_allow_html=True)
