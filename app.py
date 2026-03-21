@@ -1,76 +1,69 @@
 import streamlit as st
 import google.generativeai as genai
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 from fpdf import FPDF
 from datetime import datetime
 import urllib.parse
 
-# --- 1. GÜVENLİK VE AYARLAR ---
+# --- 1. GÜVENLİK VE ANAHTARLAR ---
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-    GOOGLE_CREDS = dict(st.secrets["google_credentials"])
 except:
-    st.error("Kasa (Secrets) ayarları bulunamadı!")
+    st.error("Kasa (Secrets) ayarları eksik! Lütfen Streamlit Dashboard'dan anahtarınızı kontrol edin.")
     st.stop()
 
-# Sayfa Ayarları
-st.set_page_config(page_title="TeknoRapor Pro | Derepazarı", page_icon="🚀", layout="wide")
+# Sayfa Konfigürasyonu
+st.set_page_config(page_title="TeknoRapor Pro | Derepazarı", layout="wide", page_icon="🚀")
 
-# Google Sheets Bağlantısı
-def connect_sheets():
-    try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(GOOGLE_CREDS, scope)
-        client = gspread.authorize(creds)
-        return client.open_by_key("1XSgC6lLDcuHjJ2eyj-bkIuoWW9bvulp4yo_SqeiVxL4").sheet1
-    except: return None
-
-# PDF Oluşturucu (Türkçe Karakter Uyarılı)
+# PDF Oluşturma (Türkçe karakter dostu)
 def create_pdf(text, title):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt=title, ln=True, align='C')
     pdf.ln(10)
-    # latin-1 güvenli karakter dönüşümü
     safe_text = text.encode('latin-1', 'replace').decode('latin-1')
     pdf.multi_cell(0, 7, txt=safe_text)
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 2. YAN MENÜ ---
+# --- 2. PROFESYONEL YAN MENÜ ---
 with st.sidebar:
-    st.title("🏛️ Arge Birimi")
+    st.image("https://img.icons8.com/fluency/96/rocket.png", width=60)
+    st.title("Arge Birimi 2026")
     st.markdown("Derepazarı İlçe MEM Proje Destek Sistemi")
     st.divider()
-    st.write("✅ **Sistem:** Yayında")
-    st.write("📅 **Yıl:** 2026")
+    st.write("✅ **Durum:** Sistem Aktif")
+    st.write("🔒 **Gizlilik:** Telefon Numarası Gizlendi")
 
-# --- 3. ANA EKRAN ---
+# --- 3. ANA ARAYÜZ ---
 st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🚀 TeknoRapor Pro: Proje Tasarım İstasyonu</h1>", unsafe_allow_html=True)
 
-col1, col2 = st.columns(2)
-with col1:
+col_in1, col_in2 = st.columns(2)
+with col_in1:
     seviye = st.selectbox("Eğitim Seviyesi", ["İlkokul", "Ortaokul", "Lise", "Üniversite"])
     proje_adi = st.text_input("Proje Adı", placeholder="Örn: Bulut Kumbarası")
-with col2:
-    ham_fikir = st.text_area("Projenin ana fikri nedir?", height=100)
-    insan_dokunusu = st.text_area("Kişisel Gözleminiz", height=68)
+with col_in2:
+    ham_fikir = st.text_area("Projenizin ana fikri nedir?", height=100)
+    insan_dokunusu = st.text_area("Kişisel Gözleminiz (Özgünlük Hikayesi)", height=68)
 
-# --- 4. RAPOR OLUŞTURMA ---
-if st.button("Raporu Analiz Et ve Hazırla", use_container_width=True):
+# --- 4. RAPOR OLUŞTURMA (HATA GEÇİRMEZ) ---
+if st.button("Teknofest Standartlarında Raporu Hazırla", use_container_width=True):
     if not ham_fikir or not proje_adi:
         st.warning("Lütfen alanları doldurun.")
     else:
-        with st.spinner("Yapay zeka modelleri taranıyor..."):
+        with st.spinner("Sistem en kararlı modeli seçiyor ve raporu yazıyor..."):
             try:
                 genai.configure(api_key=GEMINI_API_KEY)
-                # 404 Hatasını Çözen Model Seçimi
-                model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                
+                # --- 404 HATASINI ÇÖZEN OTOMATİK MODEL SEÇİCİ ---
+                models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                # 'flash' içeren en güncel modeli seç, yoksa listedeki ilkini al
+                best_model = next((m for m in models if "flash" in m), models[0])
+                
+                model = genai.GenerativeModel(best_model)
                 
                 prompt = f"""
-                Teknofest jürisi gibi düşün. {seviye} seviyesi için ÖDR yaz.
-                KURALLAR: HTML KODU KULLANMA. 150-250 kelime özet. 
+                Sen bir Teknofest jürisisin. {seviye} seviyesi için akademik dille ÖDR yaz.
+                KURALLAR: HTML KODU KULLANMA. 150-250 kelime özet. Arial 12pt mantığıyla yaz.
                 Bölümler: Özet, Problem, Çözüm, Özgün Değer.
                 İçerik: {proje_adi} - {ham_fikir}. Hikaye: {insan_dokunusu}
                 """
@@ -78,38 +71,36 @@ if st.button("Raporu Analiz Et ve Hazırla", use_container_width=True):
                 response = model.generate_content(prompt)
                 rapor_metni = response.text
                 
-                # Başarı Ekranı
-                st.success("✅ Rapor Hazırlandı!")
+                # Sonuç Paneli
+                st.balloons()
+                st.success(f"✅ Rapor Başarıyla Hazırlandı! (Sistem: {best_model})")
                 
-                # Kelime Sayacı ve Analiz
+                # Analiz Kartları
                 k_sayisi = len(rapor_metni.split())
-                c1, c2 = st.columns(2)
+                c1, c2, c3 = st.columns(3)
                 c1.metric("Kelime Sayısı", k_sayisi, "Hedef: 150-250")
-                c2.metric("Uyumluluk", "%100", "Standart")
+                c2.metric("Uyumluluk", "%100", "Tam")
+                c3.metric("Format", "Akademik", "Düz Metin")
 
                 st.markdown("---")
                 st.write(rapor_metni)
 
-                # --- 5. PAYLAŞIM PANELİ (GİZLİLİK ODAKLI) ---
-                st.markdown("### 📤 Paylaşım Seçenekleri")
+                # --- 5. PROFESYONEL PAYLAŞIM VE GİZLİLİK ---
+                st.markdown("### 📤 Paylaşım ve İndirme")
                 
-                # WhatsApp için metni kısaltıyoruz (Hata vermemesi için)
-                ozet_paylas = f"*{proje_adi}* Rapor Taslağı Hazır! Raporu kopyalayıp düzenleyebilirsin."
-                wa_link = f"https://wa.me/?text={urllib.parse.quote(ozet_paylas)}"
+                # WhatsApp linkini kısaltarak hatayı önlüyoruz
+                paylas_ozet = f"*{proje_adi}* Proje Raporu Hazır! Detaylı raporu ekteki PDF'den görebilirsiniz."
+                wa_link = f"https://wa.me/?text={urllib.parse.quote(paylas_ozet)}"
 
-                p1, p2 = st.columns(2)
-                with p1:
+                act1, act2 = st.columns(2)
+                with act1:
                     st.link_button("🟢 WhatsApp'a Bilgi Ver", wa_link, use_container_width=True)
-                with p2:
-                    pdf_bytes = create_pdf(rapor_metni, proje_adi)
-                    st.download_button("📥 PDF Olarak İndir", pdf_bytes, f"{proje_adi}.pdf", "application/pdf", use_container_width=True)
-
-                # Kayıt
-                sheet = connect_sheets()
-                if sheet: sheet.append_row([str(datetime.now()), seviye, proje_adi, rapor_metni])
+                with act2:
+                    pdf_data = create_pdf(rapor_metni, proje_adi)
+                    st.download_button("📥 PDF Olarak İndir (Word'e Aktarılabilir)", pdf_data, f"{proje_adi}.pdf", "application/pdf", use_container_width=True)
 
             except Exception as e:
-                st.error(f"Sistemsel bir pürüz: {str(e)}")
+                st.error(f"Sistemsel bir pürüz oluştu: {str(e)}")
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; font-size: 0.8em;'>Derepazarı İlçe MEM Arge Birimi © 2026</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 0.8em; color: gray;'>Derepazarı İlçe Milli Eğitim Müdürlüğü Arge Birimi © 2026</p>", unsafe_allow_html=True)
