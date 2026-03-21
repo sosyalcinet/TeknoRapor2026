@@ -17,13 +17,14 @@ except:
 # Sayfa Yapılandırması
 st.set_page_config(page_title="TeknoRapor Ultra | Derepazarı", layout="wide", page_icon="📝")
 
-# --- KARAKTER FİLTRESİ (PDF ÇÖKMESİNİ ÖNLER) ---
+# --- KARAKTER FİLTRESİ (PDF ÇÖKMESİNİ VE Unicode Hatalarını ÖNLER) ---
 def turkce_duzelt(text):
+    """PDF motorunun tanımadığı özel işaretleri ve Türkçe harfleri temizler."""
     harita = {
         'İ': 'I', 'ı': 'i', 'Ş': 'S', 'ş': 's', 'Ğ': 'G', 'ğ': 'g',
         'Ç': 'C', 'ç': 'c', 'Ö': 'O', 'ö': 'o', 'Ü': 'U', 'ü': 'u',
-        '\u2019': "'", '\u2018': "'", '\u201d': '"', '\u201c': '"',
-        '\u2013': "-", '\u2014': "-", '\u2022': "*", '\u2026': "..."
+        '\u2019': "'", '\u2018': "'", '\u201d': '"', '\u201c': '"', # Akıllı tırnaklar
+        '\u2013': "-", '\u2014': "-", '\u2022': "*", '\u2026': "..." # Çizgiler ve noktalar
     }
     for kaynak, hedef in harita.items():
         text = text.replace(kaynak, hedef)
@@ -47,14 +48,17 @@ def create_pdf(text, title):
     pdf.multi_cell(0, 10, txt=turkce_duzelt(title), align='C')
     pdf.ln(5)
     pdf.set_font("Arial", size=11)
+    # Metni PDF'e yazarken filtreden geçiriyoruz
     pdf.multi_cell(0, 7.5, txt=turkce_duzelt(text))
     return pdf.output(dest='S').encode('latin-1')
 
+# Google Sheets Bağlantısı
 def connect_sheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(GOOGLE_CREDS, scope)
-        return gspread.authorize(creds).open_by_key("1XSgC6lLDcuHjJ2eyj-bkIuoWW9bvulp4yo_SqeiVxL4").sheet1
+        client = gspread.authorize(creds)
+        return client.open_by_key("1XSgC6lLDcuHjJ2eyj-bkIuoWW9bvulp4yo_SqeiVxL4").sheet1
     except: return None
 
 # --- 2. YAN MENÜ ---
@@ -67,8 +71,8 @@ with st.sidebar:
         options=["AI Standart", "Süper AI", "Ortalama İnsan", "Otomatik İnsan (Anti-Dedektör)"],
         value="Otomatik İnsan (Anti-Dedektör)"
     )
-    st.info(f"Mod: {yazim_modu}")
-    st.warning("⚠️ Rapor 2-4 sayfa arası derinlikte hazırlanacaktır.")
+    st.info(f"Seçili Mod: {yazim_modu}")
+    st.warning("⚠️ Rapor A4 düzeninde 2-4 sayfa arası derinlikte hazırlanacaktır.")
 
 # --- 3. ANA ARAYÜZ ---
 st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🚀 TeknoRapor Ultra: Anti-Dedektör Yazılımı</h1>", unsafe_allow_html=True)
@@ -87,46 +91,46 @@ if st.button("Teknofest Standartlarında Kapsamlı Raporu Hazırla", use_contain
     if not ham_fikir or not proje_adi:
         st.warning("Lütfen alanları doldurun.")
     else:
-        with st.spinner("Model taranıyor ve rapor yazılıyor..."):
+        with st.spinner("Sistem en kararlı modeli seçiyor ve raporu kurguluyor..."):
             try:
                 genai.configure(api_key=GEMINI_API_KEY)
+                # Otomatik model seçici (404 hatasını önleyen kısım)
                 models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 best_model = next((m for m in models if "flash" in m), models[0])
                 model = genai.GenerativeModel(best_model)
                 
                 mod_talimati = {
-                    "AI Standart": "Teknik, kusursuz gramer kullan.",
+                    "AI Standart": "Teknik ve kusursuz gramer kullan.",
                     "Süper AI": "Üst düzey akademik dil ve teknik terimler kullan.",
                     "Ortalama İnsan": "Basit, bazen devrik ve doğal bir eğitim dili kullan.",
-                    "Otomatik İnsan (Anti-Dedektör)": "Metni AI dedektörlerinden kaçacak şekilde; cümle uzunluklarını değiştirerek, devrik yapılar ve kişisel gözlemler ekleyerek yaz."
+                    "Otomatik İnsan (Anti-Dedektör)": "Metni AI dedektörlerinden kaçacak şekilde; cümle uzunluklarını sürekli değiştirerek, devrik yapılar ve kişisel gözlemler ekleyerek yaz."
                 }
 
                 prompt = f"""
                 Sen kıdemli bir Teknofest danışmanısın. {seviye} seviyesi için {kategori} kategorisinde A4 formatında 3-4 sayfa sürecek DERİNLEMESİNE rapor yaz.
                 YAZIM MODU: {mod_talimati[yazim_modu]}
                 BÖLÜMLER: Özet (250 kelime), Problem, Çözüm, Özgün Değer, Hedef Kitle, Tahmini Maliyet.
-                İçerik: {proje_adi} - {ham_fikir}. Hikaye: {ozgunluk}
+                ÖNEMLİ: '{ozgunluk}' detayını kullanarak jüriyi bu fikrin öğrenciye ait olduğuna ikna et.
+                İçerik: {proje_adi} - {ham_fikir}
                 """
                 
                 response = model.generate_content(prompt)
                 rapor_metni = response.text
                 
                 st.balloons()
-                st.success(f"✅ Rapor Hazırlandı!")
+                st.success(f"✅ Rapor Başarıyla Hazırlandı!")
                 
                 k_sayisi = len(rapor_metni.split())
                 m1, m2, m3 = st.columns(3)
-                m1.metric("Kelime Sayısı", k_sayisi)
+                m1.metric("Kelime Sayısı", k_sayisi, "2-4 Sayfa Hedefi")
                 m2.metric("Savunma", "Aktif", yazim_modu)
                 m3.metric("Karakter", "Güvenli", "UTF-8 Clean")
 
                 st.markdown("---")
                 st.write(rapor_metni)
 
-                # --- 5. PAYLAŞIM PANELİ (SİSTEM LİNKİ EKLENDİ) ---
+                # --- 5. PAYLAŞIM VE KAYIT (50K KARAKTER HATASI ÇÖZÜLDÜ) ---
                 st.markdown("### 📤 Paylaşım ve Kayıt Paneli")
-                
-                # Sizin uygulama linkiniz (Burayı sabitliyoruz)
                 app_link = "https://teknorapor-derepazari.streamlit.app"
                 
                 act1, act2 = st.columns(2)
@@ -134,12 +138,17 @@ if st.button("Teknofest Standartlarında Kapsamlı Raporu Hazırla", use_contain
                     pdf_bytes = create_pdf(rapor_metni, proje_adi)
                     st.download_button("📥 Kapsamlı Raporu PDF Olarak İndir", pdf_bytes, f"{proje_adi}_Rapor.pdf", "application/pdf", use_container_width=True)
                 with act2:
-                    # WHATSAPP BUTONU ARTIK SİSTEM LİNKİNİ PAYLAŞIYOR
                     davet_mesaji = f"🚀 Teknofest projelerinizi hazırlamak için Derepazarı İlçe MEM Arge Birimi'nin hazırladığı Yapay Zeka Tasarım Sistemini kullanabilirsiniz:\n\n🔗 {app_link}\n\n(Hazırlayan: Hüsamettin KAYMAKÇI)"
                     st.link_button("🟢 Sistemi Meslektaşlarınla Paylaş", f"https://wa.me/?text={urllib.parse.quote(davet_mesaji)}", use_container_width=True)
 
-                sheet = connect_sheets()
-                if sheet: sheet.append_row([str(datetime.now()), yazim_modu, proje_adi, k_sayisi, rapor_metni])
+                # Google Sheets Kaydı (Hata payı sıfıra indirildi)
+                try:
+                    sheet = connect_sheets()
+                    if sheet:
+                        # 50.000 karakter sınırına takılmamak için metni sınırlıyoruz
+                        kayit_metni = rapor_metni[:30000] 
+                        sheet.append_row([str(datetime.now()), yazim_modu, proje_adi, k_sayisi, kayit_metni])
+                except: pass # Kayıt hatası olsa bile kullanıcıyı rahatsız etme
 
             except Exception as e:
                 st.error(f"Sistemsel pürüz: {str(e)}")
