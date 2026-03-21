@@ -77,7 +77,7 @@ with st.sidebar:
     st.link_button("✈️ Telegram: @sosyalcinet", "https://t.me/sosyalcinet")
 
 # --- 3. ANA ARAYÜZ ---
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🚀 TeknoRapor Premium: Kapsamlı Yazım İstasyonu</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🚀 TeknoFest Otomatik ÖDR </h1>", unsafe_allow_html=True)
 
 c1, c2 = st.columns(2)
 with c1:
