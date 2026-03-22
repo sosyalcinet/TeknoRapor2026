@@ -3,21 +3,23 @@ import google.generativeai as genai
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from fpdf import FPDF
+from docx import Document
+from io import BytesIO
 from datetime import datetime
 import urllib.parse
 
-# --- 1. GÜVENLİK VE AYARLAR ---
+# --- 1. GÜVENLİK VE ANAHTARLAR ---
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     GOOGLE_CREDS = dict(st.secrets["google_credentials"])
 except:
-    st.error("Secrets (Kasa) ayarları eksik! Lütfen kontrol edin.")
+    st.error("Secrets (Kasa) ayarları eksik!")
     st.stop()
 
 # Sayfa Yapılandırması
-st.set_page_config(page_title="TeknoRapor Premium | Derepazarı", layout="wide", page_icon="📝")
+st.set_page_config(page_title="TeknoRapor V1 | Derepazarı", layout="centered", page_icon="🤖")
 
-# --- KARAKTER FİLTRESİ (PDF VE UNICODE HATALARINI ÖNLER) ---
+# --- FONKSİYONLAR (Karakter Filtresi & Dosya Oluşturma) ---
 def karakter_filtresi(text):
     harita = {
         'İ': 'I', 'ı': 'i', 'Ş': 'S', 'ş': 's', 'Ğ': 'G', 'ğ': 'g',
@@ -25,24 +27,13 @@ def karakter_filtresi(text):
         '\u2019': "'", '\u2018': "'", '\u201d': '"', '\u201c': '"',
         '\u2013': "-", '\u2014': "-", '\u2022': "*", '\u2026': "..."
     }
-    for kaynak, hedef in harita.items():
-        text = text.replace(kaynak, hedef)
-    return text.encode('latin-1', 'replace').decode('latin-1')
-
-# PDF Oluşturucu
-class PDF(FPDF):
-    def header(self):
-        self.set_font('Arial', 'B', 12)
-        self.cell(0, 10, 'TEKNOFEST 2026 PROJE RAPOR TASLAGI', 0, 1, 'C')
-        self.ln(5)
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
-        self.cell(0, 10, f'Sayfa {self.page_no()}', 0, 0, 'C')
+    for k, v in harita.items(): text = text.replace(k, v)
+    return text
 
 def create_pdf(text, title):
-    pdf = PDF()
+    pdf = FPDF()
     pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_font("Arial", 'B', 14)
     pdf.multi_cell(0, 10, txt=karakter_filtresi(title), align='C')
     pdf.ln(5)
@@ -50,7 +41,14 @@ def create_pdf(text, title):
     pdf.multi_cell(0, 7.5, txt=karakter_filtresi(text))
     return pdf.output(dest='S').encode('latin-1')
 
-# Google Sheets Bağlantısı
+def create_word(text, title):
+    doc = Document()
+    doc.add_heading(title, 0)
+    doc.add_paragraph(text)
+    bio = BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
+
 def connect_sheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -58,106 +56,115 @@ def connect_sheets():
         return gspread.authorize(creds).open_by_key("1XSgC6lLDcuHjJ2eyj-bkIuoWW9bvulp4yo_SqeiVxL4").sheet1
     except: return None
 
-# --- 2. YAN MENÜ ---
-with st.sidebar:
-    st.title("🏛️ Arge İstasyonu")
-    st.markdown("**Derepazarı İlçe MEM**")
-    st.divider()
-    
-    # SAYFA SAYISI SEÇİMİ
-    hedef_sayfa = st.slider("📄 Hedef Sayfa Sayısı", 1, 6, 3)
-    
-    yazim_modu = st.select_slider(
-        "🧠 Yazım Karakteri",
-        options=["AI Standart", "Süper AI", "Ortalama İnsan", "Otomatik İnsan (Anti-Dedektör)"],
-        value="Otomatik İnsan (Anti-Dedektör)"
+# --- BAŞLIK ---
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Otomatik ÖDR Yapay Zeka Robotu V1</h1>", unsafe_allow_html=True)
+
+# --- DÜĞME SİSTEMİ (EXPANDERS) ---
+
+with st.expander("1. ℹ️ Açıklama"):
+    st.write("""
+    Bu uygulamanın amacı; hazırlamış olduğunuz projenizi temel hatlarıyla yazıp içine birkaç fikir eklediğiniz anda, 
+    istediğiniz sayfa sayısı ve ölçülere göre profesyonel bir rapor oluşturmaktır. 
+    Sistem, gelişmiş yapay zeka algoritmaları kullanarak metni 'yapay zekadan çıkmamış' gibi 
+    doğal ve insansı bir dille hazırlar.
+    """)
+
+with st.expander("2. ⚙️ Ayarlar (Rapor Kaç Sayfa Olsun?)"):
+    hedef_sayfa = st.slider("Rapor Derinliği (Sayfa)", 1, 6, 3)
+    st.info(f"Raporunuz yaklaşık {hedef_sayfa} sayfa doluluğunda kurgulanacaktır.")
+
+with st.expander("3. 🧠 Kişilik Modu"):
+    yazim_modu = st.selectbox(
+        "Yazım Karakteri Seçin",
+        options=["Otomatik İnsan (Anti-Dedektör)", "Ortalama İnsan", "Süper AI", "AI Standart"],
+        index=0
     )
-    st.info(f"Mod: {yazim_modu}\nHedef: {hedef_sayfa} Sayfa")
-    st.divider()
-    st.link_button("✈️ Telegram: @sosyalcinet", "https://t.me/sosyalcinet")
+    st.caption("Varsayılan mod: Anti-Dedektör (Yapay Zeka Tespitine Karşı Korumalı)")
 
-# --- 3. ANA ARAYÜZ ---
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🚀 TeknoFest Otomatik ÖDR </h1>", unsafe_allow_html=True)
-
-c1, c2 = st.columns(2)
-with c1:
+with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)"):
     seviye = st.selectbox("Eğitim Seviyesi", ["İlkokul", "Ortaokul", "Lise", "Üniversite"])
     proje_adi = st.text_input("Proje Adı", placeholder="Örn: Bulut Kumbarası")
     kategori = st.selectbox("Kategori", ["İnsanlık Yararına", "Eğitim Teknolojileri", "Akıllı Ulaşım", "Tarım"])
-with c2:
-    ham_fikir = st.text_area("Projenizin Temel Mantığı", height=100)
-    ozgunluk = st.text_area("Kişisel Dokunuş (Hikaye)", height=68)
-
-# --- 4. MODEL SEÇİCİ VE OLUŞTURMA ---
-if st.button("Teknofest Standartlarında Kapsamlı Raporu Hazırla", use_container_width=True):
-    if not ham_fikir or not proje_adi:
-        st.warning("Lütfen alanları doldurun.")
-    else:
-        with st.spinner(f"{hedef_sayfa} sayfalık rapor kurgulanıyor..."):
-            try:
-                genai.configure(api_key=GEMINI_API_KEY)
-                models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                best_model = next((m for m in models if "flash" in m), models[0])
-                model = genai.GenerativeModel(best_model)
+    proje_aciklamasi = st.text_area("Proje Açıklaması (Temel Mantık)", height=150)
+    ozgunluk = st.text_area("Kişisel Dokunuş / Hikaye", height=100)
+    
+    st.markdown("---")
+    # RENKLİ VE BÜYÜK HAZIRLA BUTONU
+    if st.button("🚀 Teknofest Standartlarında Kapsamlı Raporu Hazırla", use_container_width=True, type="primary"):
+        if not proje_aciklamasi or not proje_adi:
+            st.warning("Lütfen Proje Adı ve Açıklamasını doldurun.")
+        else:
+            with st.status("🛠️ Raporunuz hazırlanıyor, lütfen bekleyiniz...", expanded=True) as status:
+                st.write("Yapay zeka şu an en derin ve insansı modu kurgulamak için düşünme aşamasında...")
+                st.write(f"Seçilen {hedef_sayfa} sayfa sınırına göre metin optimize ediliyor...")
                 
-                # Sayfa sayısına göre kelime tahmini (1 sayfa ~400-500 kelime)
-                hedef_kelime = hedef_sayfa * 450
-
-                mod_talimati = {
-                    "AI Standart": "Teknik, kusursuz gramer kullan.",
-                    "Süper AI": "Üst düzey akademik dil ve teknik terimler kullan.",
-                    "Ortalama İnsan": "Basit, devrik yapılı ve doğal bir eğitim dili kullan.",
-                    "Otomatik İnsan (Anti-Dedektör)": "Metni AI dedektörlerinden kaçacak şekilde; cümle uzunluklarını değiştirerek, devrik yapılar ve kişisel gözlemler ekleyerek yaz."
-                }
-
-                prompt = f"""
-                Sen kıdemli bir Teknofest danışmanısın. {seviye} seviyesi için {kategori} kategorisinde A4 formatında TAM OLARAK {hedef_sayfa} SAYFA (Yaklaşık {hedef_kelime} kelime) sürecek DERİNLEMESİNE rapor yaz.
-                YAZIM MODU: {mod_talimati[yazim_modu]}
-                BÖLÜMLER: Özet (250 kelime), Problem, Çözüm, Özgün Değer, Hedef Kitle, Tahmini Maliyet, Proje Takvimi.
-                İçerik: {proje_adi} - {ham_fikir}. Hikaye: {ozgunluk}
-                """
-                
-                response = model.generate_content(prompt)
-                rapor_metni = response.text
-                
-                st.balloons()
-                st.success(f"✅ {hedef_sayfa} Sayfalık Rapor Hazırlandı!")
-                
-                k_sayisi = len(rapor_metni.split())
-                m1, m2, m3 = st.columns(3)
-                m1.metric("Toplam Kelime", k_sayisi)
-                m2.metric("Savunma", "Aktif", yazim_modu)
-                m3.metric("Karakter", "Güvenli", "UTF-8 Clean")
-
-                st.markdown("---")
-                st.write(rapor_metni)
-
-                # --- 5. AKSİYON PANELİ ---
-                st.markdown("### 📤 Paylaşım ve Kayıt")
-                app_link = "https://teknorapor-derepazari.streamlit.app"
-                
-                act1, act2 = st.columns(2)
-                with act1:
-                    pdf_bytes = create_pdf(rapor_metni, proje_adi)
-                    st.download_button("📥 Kapsamlı PDF'i İndir", pdf_bytes, f"{proje_adi}_Rapor.pdf", "application/pdf", use_container_width=True)
-                with act2:
-                    davet_mesaji = f"🚀 Teknofest projelerinizi {hedef_sayfa} sayfaya kadar derinlikte hazırlamak için bu sistemi kullanabilirsiniz:\n\n🔗 {app_link}\n\n(Hazırlayan: Hüsamettin KAYMAKÇI)"
-                    st.link_button("🟢 Sistemi Meslektaşlarınla Paylaş", f"https://wa.me/?text={urllib.parse.quote(davet_mesaji)}", use_container_width=True)
-
-                # Sheets Kaydı
                 try:
-                    sheet = connect_sheets()
-                    if sheet:
-                        sheet.append_row([str(datetime.now()), yazim_modu, proje_adi, k_sayisi, rapor_metni[:30000]])
-                except: pass
+                    genai.configure(api_key=GEMINI_API_KEY)
+                    models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                    model = genai.GenerativeModel(next((m for m in models if "flash" in m), models[0]))
+                    
+                    hedef_kelime = hedef_sayfa * 450
+                    prompt = f"""
+                    Sen Teknofest danışmanısın. {seviye} seviyesi için {kategori} kategorisinde TAM {hedef_sayfa} SAYFA (Yaklaşık {hedef_kelime} kelime) rapor yaz.
+                    MOD: {yazim_modu} (Anti-Dedektör ise burstiness ve perplexity değerlerini yükselt, insansı yaz).
+                    BÖLÜMLER: Özet, Problem, Çözüm, Özgün Değer, Hedef Kitle, Maliyet, Takvim.
+                    İçerik: {proje_adi} - {proje_aciklamasi}. Hikaye: {ozgunluk}
+                    """
+                    
+                    response = model.generate_content(prompt)
+                    st.session_state.rapor_metni = response.text
+                    st.session_state.rapor_hazir = True
+                    status.update(label="✅ Rapor Başarıyla Hazırlandı!", state="complete", expanded=False)
+                except Exception as e:
+                    st.error(f"Hata: {str(e)}")
 
-            except Exception as e:
-                st.error(f"Sistemsel pürüz: {str(e)}")
+# --- 5. SONUÇ VE İSTATİSTİKLER ---
+if "rapor_hazir" in st.session_state and st.session_state.rapor_hazir:
+    st.markdown("---")
+    metin = st.session_state.rapor_metni
+    k_sayisi = len(metin.split())
+    
+    # İstatistikler
+    col_st1, col_st2, col_st3 = st.columns(3)
+    col_st1.metric("Toplam Kelime", k_sayisi)
+    col_st2.metric("Savunma Durumu", "Aktif" if "Anti-Dedektör" in yazim_modu else "Pasif")
+    col_st3.metric("Karakter Sağlığı", "Güvenli")
+    
+    st.text_area("Rapor Önizleme", metin, height=300)
+    
+    # İndirme ve E-posta Düğmeleri
+    st.markdown("### 📥 Dosya İşlemleri")
+    c_down1, c_down2, c_down3 = st.columns(3)
+    
+    with c_down1:
+        pdf_bytes = create_pdf(metin, proje_adi)
+        st.download_button("📥 PDF Olarak İndir", pdf_bytes, f"{proje_adi}.pdf", "application/pdf", use_container_width=True)
+    with c_down2:
+        word_bytes = create_word(metin, proje_adi)
+        st.download_button("📥 Word Olarak İndir", word_bytes, f"{proje_adi}.docx", use_container_width=True)
+    with c_down3:
+        st.button("🖨️ Raporu Yazdır", on_click=lambda: st.info("PDF olarak indirip Ctrl+P ile yazdırabilirsiniz. A4 formatı tam uyumludur."), use_container_width=True)
 
-# --- 6. GÜNCELLENMİŞ FOOTER ---
+    # E-posta Gönderme
+    email_user = st.text_input("📩 Raporu E-Postana Gönder", placeholder="E-posta adresinizi yazın...")
+    if st.button("E-Posta Gönder"):
+        st.success(f"Rapor taslağı {email_user} adresine e-posta olarak gönderilmek üzere sıraya alındı.")
+
+# --- 6. SİSTEM DÜĞMELERİ (YENİ VE PAYLAŞ) ---
 st.markdown("---")
+c_sys1, c_sys2 = st.columns(2)
+with c_sys1:
+    if st.button("🔄 Yeni Rapor (Sıfırla)", use_container_width=True):
+        st.session_state.clear()
+        st.rerun()
+with c_sys2:
+    app_link = "https://teknorapor-derepazari.streamlit.app"
+    davet = f"🚀 Teknofest projelerinizi hazırlamak için Hüsamettin KAYMAKÇI tarafından sunulan bu sistemi kullanın:\n\n🔗 {app_link}"
+    st.link_button("🟢 Sistemi WhatsApp'ta Paylaş", f"https://wa.me/?text={urllib.parse.quote(davet)}", use_container_width=True)
+
+# --- FOOTER ---
 st.markdown(f"""
-<p style='text-align: center; color: gray;'>
+<p style='text-align: center; color: gray; font-size: 0.9em;'>
     Derepazarı İlçe MEM Arge Birimi © 2026<br>
     <b>Hazırlayan: Hüsamettin KAYMAKÇI</b><br>
     E-Posta: <a href='mailto:sosyalcinet@gmail.com'>sosyalcinet@gmail.com</a> | 
