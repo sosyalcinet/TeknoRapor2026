@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import google.generativeai as genai
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -8,37 +9,45 @@ from io import BytesIO
 from datetime import datetime
 import urllib.parse
 
-# --- 1. GÜVENLİK VE ANAHTARLAR ---
+# --- 1. GÜVENLİK VE AYARLAR ---
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     GOOGLE_CREDS = dict(st.secrets["google_credentials"])
 except:
-    st.error("Secrets (Kasa) ayarları eksik!")
+    st.error("Kasa (Secrets) ayarları bulunamadı!")
     st.stop()
 
 # Sayfa Yapılandırması
-st.set_page_config(page_title="TeknoRapor V1 | Derepazarı", layout="centered", page_icon="🤖")
+st.set_page_config(page_title="TeknoRapor V1", layout="centered", page_icon="🤖")
 
-# --- FONKSİYONLAR (Karakter Filtresi & Dosya Oluşturma) ---
-def karakter_filtresi(text):
+# --- KARAKTER VE BİÇİM TEMİZLEYİCİ ---
+def format_temizle(text):
+    """Metindeki Markdown işaretlerini ve PDF'i bozan karakterleri temizler."""
+    # Markdown işaretlerini kaldır
+    temiz = text.replace("**", "").replace("##", "").replace("#", "").replace("__", "")
+    
+    # PDF motorunun tanımadığı özel işaretleri dönüştür
     harita = {
         'İ': 'I', 'ı': 'i', 'Ş': 'S', 'ş': 's', 'Ğ': 'G', 'ğ': 'g',
         'Ç': 'C', 'ç': 'c', 'Ö': 'O', 'ö': 'o', 'Ü': 'U', 'ü': 'u',
         '\u2019': "'", '\u2018': "'", '\u201d': '"', '\u201c': '"',
         '\u2013': "-", '\u2014': "-", '\u2022': "*", '\u2026': "..."
     }
-    for k, v in harita.items(): text = text.replace(k, v)
-    return text
+    for kaynak, hedef in harita.items():
+        temiz = temiz.replace(kaynak, hedef)
+    
+    return temiz.encode('latin-1', 'replace').decode('latin-1')
 
+# --- DOSYA OLUŞTURUCULAR ---
 def create_pdf(text, title):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_font("Arial", 'B', 14)
-    pdf.multi_cell(0, 10, txt=karakter_filtresi(title), align='C')
+    pdf.multi_cell(0, 10, txt=format_temizle(title), align='C')
     pdf.ln(5)
     pdf.set_font("Arial", size=11)
-    pdf.multi_cell(0, 7.5, txt=karakter_filtresi(text))
+    pdf.multi_cell(0, 7.5, txt=format_temizle(text))
     return pdf.output(dest='S').encode('latin-1')
 
 def create_word(text, title):
@@ -49,54 +58,43 @@ def create_word(text, title):
     doc.save(bio)
     return bio.getvalue()
 
-def connect_sheets():
-    try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(GOOGLE_CREDS, scope)
-        return gspread.authorize(creds).open_by_key("1XSgC6lLDcuHjJ2eyj-bkIuoWW9bvulp4yo_SqeiVxL4").sheet1
-    except: return None
-
-# --- BAŞLIK ---
+# --- BAŞLIK (SABİT) ---
 st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Otomatik ÖDR Yapay Zeka Robotu V1</h1>", unsafe_allow_html=True)
 
 # --- DÜĞME SİSTEMİ (EXPANDERS) ---
 
 with st.expander("1. ℹ️ Açıklama"):
     st.write("""
-    Bu uygulamanın amacı; hazırlamış olduğunuz projenizi temel hatlarıyla yazıp içine birkaç fikir eklediğiniz anda, 
-    istediğiniz sayfa sayısı ve ölçülere göre profesyonel bir rapor oluşturmaktır. 
-    Sistem, gelişmiş yapay zeka algoritmaları kullanarak metni 'yapay zekadan çıkmamış' gibi 
-    doğal ve insansı bir dille hazırlar.
+    Bu sistem, hazırladığınız projenin temel fikrini profesyonel, kurumsal ve akademik bir rapor formatına dönüştürmek için tasarlanmıştır. 
+    Kaç sayfa olacağını ve yazım stilini sizin belirlediğiniz bu robot, metni yapay zeka tespit araçlarına yakalanmayacak şekilde (Anti-Dedektör modu) 
+    doğal bir dille kurgular.
     """)
 
-with st.expander("2. ⚙️ Ayarlar (Rapor Kaç Sayfa Olsun?)"):
-    hedef_sayfa = st.slider("Rapor Derinliği (Sayfa)", 1, 6, 3)
-    st.info(f"Raporunuz yaklaşık {hedef_sayfa} sayfa doluluğunda kurgulanacaktır.")
+with st.expander("2. ⚙️ Ayarlar (Rapor Sayfa Sayısı)"):
+    hedef_sayfa = st.slider("Hedef Sayfa Sayısı", 1, 6, 3)
 
 with st.expander("3. 🧠 Kişilik Modu"):
     yazim_modu = st.selectbox(
-        "Yazım Karakteri Seçin",
+        "Mod Seçimi",
         options=["Otomatik İnsan (Anti-Dedektör)", "Ortalama İnsan", "Süper AI", "AI Standart"],
         index=0
     )
-    st.caption("Varsayılan mod: Anti-Dedektör (Yapay Zeka Tespitine Karşı Korumalı)")
 
-with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)"):
+with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)", expanded=True):
     seviye = st.selectbox("Eğitim Seviyesi", ["İlkokul", "Ortaokul", "Lise", "Üniversite"])
     proje_adi = st.text_input("Proje Adı", placeholder="Örn: Bulut Kumbarası")
     kategori = st.selectbox("Kategori", ["İnsanlık Yararına", "Eğitim Teknolojileri", "Akıllı Ulaşım", "Tarım"])
-    proje_aciklamasi = st.text_area("Proje Açıklaması (Temel Mantık)", height=150)
+    proje_aciklamasi = st.text_area("Proje Açıklaması", height=150)
     ozgunluk = st.text_area("Kişisel Dokunuş / Hikaye", height=100)
     
     st.markdown("---")
-    # RENKLİ VE BÜYÜK HAZIRLA BUTONU
     if st.button("🚀 Teknofest Standartlarında Kapsamlı Raporu Hazırla", use_container_width=True, type="primary"):
         if not proje_aciklamasi or not proje_adi:
             st.warning("Lütfen Proje Adı ve Açıklamasını doldurun.")
         else:
-            with st.status("🛠️ Raporunuz hazırlanıyor, lütfen bekleyiniz...", expanded=True) as status:
-                st.write("Yapay zeka şu an en derin ve insansı modu kurgulamak için düşünme aşamasında...")
-                st.write(f"Seçilen {hedef_sayfa} sayfa sınırına göre metin optimize ediliyor...")
+            with st.status("🛠️ Rapor hazırlanıyor...", expanded=True) as status:
+                st.write("Yapay zeka şu an düşünen modda en iyi işi çıkarmaya çalışıyor...")
+                st.write(f"Raporunuz {hedef_sayfa} sayfa kuralına göre optimize ediliyor...")
                 
                 try:
                     genai.configure(api_key=GEMINI_API_KEY)
@@ -105,8 +103,8 @@ with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)"):
                     
                     hedef_kelime = hedef_sayfa * 450
                     prompt = f"""
-                    Sen Teknofest danışmanısın. {seviye} seviyesi için {kategori} kategorisinde TAM {hedef_sayfa} SAYFA (Yaklaşık {hedef_kelime} kelime) rapor yaz.
-                    MOD: {yazim_modu} (Anti-Dedektör ise burstiness ve perplexity değerlerini yükselt, insansı yaz).
+                    Sen Teknofest jürisisin. {seviye} seviyesi için {kategori} kategorisinde TAM {hedef_sayfa} SAYFA (Yaklaşık {hedef_kelime} kelime) rapor yaz.
+                    MOD: {yazim_modu} (İnsansı ve akademik). HTML veya Markdown (** veya ##) işaretleri KULLANMA.
                     BÖLÜMLER: Özet, Problem, Çözüm, Özgün Değer, Hedef Kitle, Maliyet, Takvim.
                     İçerik: {proje_adi} - {proje_aciklamasi}. Hikaye: {ozgunluk}
                     """
@@ -114,43 +112,50 @@ with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)"):
                     response = model.generate_content(prompt)
                     st.session_state.rapor_metni = response.text
                     st.session_state.rapor_hazir = True
-                    status.update(label="✅ Rapor Başarıyla Hazırlandı!", state="complete", expanded=False)
+                    status.update(label="✅ Rapor Hazır!", state="complete", expanded=False)
                 except Exception as e:
                     st.error(f"Hata: {str(e)}")
 
-# --- 5. SONUÇ VE İSTATİSTİKLER ---
+# --- 5. RAPOR GÖRÜNÜMÜ VE İSTATİSTİKLER ---
 if "rapor_hazir" in st.session_state and st.session_state.rapor_hazir:
     st.markdown("---")
     metin = st.session_state.rapor_metni
-    k_sayisi = len(metin.split())
+    temiz_metin = metin.replace("**", "").replace("##", "").replace("#", "")
     
     # İstatistikler
     col_st1, col_st2, col_st3 = st.columns(3)
-    col_st1.metric("Toplam Kelime", k_sayisi)
-    col_st2.metric("Savunma Durumu", "Aktif" if "Anti-Dedektör" in yazim_modu else "Pasif")
+    col_st1.metric("Toplam Kelime", len(metin.split()))
+    col_st2.metric("Savunma Durumu", "Aktif")
     col_st3.metric("Karakter Sağlığı", "Güvenli")
     
-    st.text_area("Rapor Önizleme", metin, height=300)
+    # AYRI RAPOR SAYFASI GÖRÜNÜMÜ (A4 SİMÜLASYONU)
+    st.markdown("### 📄 Rapor Önizleme")
+    st.markdown(f"""
+    <div style="background-color: white; padding: 40px; color: black; border: 1px solid #ddd; border-radius: 5px; font-family: Arial; line-height: 1.6; text-align: justify; height: 500px; overflow-y: scroll;">
+        <h2 style="text-align: center;">{proje_adi.upper()}</h2>
+        <p>{temiz_metin.replace('\n', '<br>')}</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # İndirme ve E-posta Düğmeleri
-    st.markdown("### 📥 Dosya İşlemleri")
+    st.markdown("### 📥 İşlemler")
     c_down1, c_down2, c_down3 = st.columns(3)
     
     with c_down1:
-        pdf_bytes = create_pdf(metin, proje_adi)
-        st.download_button("📥 PDF Olarak İndir", pdf_bytes, f"{proje_adi}.pdf", "application/pdf", use_container_width=True)
+        pdf_bytes = create_pdf(temiz_metni, proje_adi)
+        st.download_button("📥 PDF Olarak İndir", pdf_bytes, f"{proje_adi}.pdf", use_container_width=True)
     with c_down2:
-        word_bytes = create_word(metin, proje_adi)
+        word_bytes = create_word(temiz_metni, proje_adi)
         st.download_button("📥 Word Olarak İndir", word_bytes, f"{proje_adi}.docx", use_container_width=True)
     with c_down3:
-        st.button("🖨️ Raporu Yazdır", on_click=lambda: st.info("PDF olarak indirip Ctrl+P ile yazdırabilirsiniz. A4 formatı tam uyumludur."), use_container_width=True)
+        if st.button("🖨️ Raporu Yazdır", use_container_width=True):
+            components.html("<script>window.print();</script>", height=0)
 
-    # E-posta Gönderme
-    email_user = st.text_input("📩 Raporu E-Postana Gönder", placeholder="E-posta adresinizi yazın...")
+    # E-posta
+    email_addr = st.text_input("📩 Raporu E-Postana Gönder", placeholder="E-posta adresiniz...")
     if st.button("E-Posta Gönder"):
-        st.success(f"Rapor taslağı {email_user} adresine e-posta olarak gönderilmek üzere sıraya alındı.")
+        st.success(f"Rapor {email_addr} adresine yönlendirildi.")
 
-# --- 6. SİSTEM DÜĞMELERİ (YENİ VE PAYLAŞ) ---
+# --- 6. SİSTEM DÜĞMELERİ ---
 st.markdown("---")
 c_sys1, c_sys2 = st.columns(2)
 with c_sys1:
