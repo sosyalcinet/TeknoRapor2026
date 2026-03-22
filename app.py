@@ -14,15 +14,13 @@ try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     GOOGLE_CREDS = dict(st.secrets["google_credentials"])
 except:
-    st.error("Kasa (Secrets) ayarları bulunamadı! Lütfen kontrol edin.")
+    st.error("Secrets (Kasa) ayarları eksik! Lütfen kontrol edin.")
     st.stop()
 
-# Sayfa Yapılandırması
 st.set_page_config(page_title="TeknoRapor V1", layout="centered", page_icon="🤖")
 
-# --- KARAKTER VE BİÇİM TEMİZLEYİCİ ---
+# --- KARAKTER VE BİÇİM FİLTRESİ ---
 def format_temizle(text):
-    """Metindeki Markdown işaretlerini temizler ve PDF uyumlu hale getirir."""
     temiz = text.replace("**", "").replace("##", "").replace("#", "").replace("__", "")
     harita = {
         'İ': 'I', 'ı': 'i', 'Ş': 'S', 'ş': 's', 'Ğ': 'G', 'ğ': 'g',
@@ -30,9 +28,8 @@ def format_temizle(text):
         '\u2019': "'", '\u2018': "'", '\u201d': '"', '\u201c': '"',
         '\u2013': "-", '\u2014': "-", '\u2022': "*", '\u2026': "..."
     }
-    for kaynak, hedef in harita.items():
-        temiz = temiz.replace(kaynak, hedef)
-    return temiz.encode('latin-1', 'replace').decode('latin-1')
+    for k, v in harita.items(): temiz = temiz.replace(k, v)
+    return temiz
 
 # --- DOSYA OLUŞTURUCULAR ---
 def create_pdf(text, title):
@@ -49,9 +46,7 @@ def create_pdf(text, title):
 def create_word(text, title):
     doc = Document()
     doc.add_heading(title, 0)
-    # Word için Markdown temizliği yeterli, özel karakter filtresine PDF kadar sert gerek duymaz
-    temiz_word = text.replace("**", "").replace("##", "").replace("#", "")
-    doc.add_paragraph(temiz_word)
+    doc.add_paragraph(text.replace("**", "").replace("##", ""))
     bio = BytesIO()
     doc.save(bio)
     return bio.getvalue()
@@ -63,30 +58,18 @@ def connect_sheets():
         return gspread.authorize(creds).open_by_key("1XSgC6lLDcuHjJ2eyj-bkIuoWW9bvulp4yo_SqeiVxL4").sheet1
     except: return None
 
-# --- BAŞLIK (SABİT) ---
+# --- BAŞLIK ---
 st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Otomatik ÖDR Yapay Zeka Robotu V1</h1>", unsafe_allow_html=True)
 
-# --- DÜĞME SİSTEMİ (EXPANDERS) ---
-
+# --- DÜĞME SİSTEMİ ---
 with st.expander("1. ℹ️ Açıklama"):
-    st.write("""
-    Bu uygulamanın amacı; hazırladığınız projenizi temel hatlarıyla yazıp içine birkaç fikir eklediğiniz anda, 
-    istediğiniz sayfa sayısı ve ölçülere göre profesyonel bir rapor oluşturmaktır. 
-    Sistem, gelişmiş yapay zeka algoritmaları kullanarak metni 'yapay zekadan çıkmamış' gibi 
-    doğal ve insansı bir dille hazırlar.
-    """)
+    st.write("Bu uygulamanın amacı; projenizi temel hatlarıyla yazıp içine birkaç fikir eklediğiniz anda, istediğiniz sayfa sayısı ve akademik ölçülere göre profesyonel bir rapor oluşturmaktır. Sistem, metni 'yapay zekadan çıkmamış' gibi doğal ve insansı bir dille hazırlar.")
 
 with st.expander("2. ⚙️ Ayarlar (Rapor Kaç Sayfa Olsun?)"):
     hedef_sayfa = st.slider("Rapor Derinliği (Sayfa)", 1, 6, 3)
-    st.info(f"Raporunuz yaklaşık {hedef_sayfa} sayfa doluluğunda kurgulanacaktır.")
 
 with st.expander("3. 🧠 Kişilik Modu"):
-    yazim_modu = st.selectbox(
-        "Yazım Karakteri Seçin",
-        options=["Otomatik İnsan (Anti-Dedektör)", "Ortalama İnsan", "Süper AI", "AI Standart"],
-        index=0
-    )
-    st.caption("Varsayılan mod: Anti-Dedektör (Yapay Zeka Tespitine Karşı Korumalı)")
+    yazim_modu = st.selectbox("Yazım Karakteri", ["Otomatik İnsan (Anti-Dedektör)", "Ortalama İnsan", "Süper AI", "AI Standart"], index=0)
 
 with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)", expanded=True):
     seviye = st.selectbox("Eğitim Seviyesi", ["İlkokul", "Ortaokul", "Lise", "Üniversite"])
@@ -95,105 +78,64 @@ with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)", expanded=True):
     proje_aciklamasi = st.text_area("Proje Açıklaması", height=150)
     ozgunluk = st.text_area("Kişisel Dokunuş / Hikaye", height=100)
     
-    st.markdown("---")
     if st.button("🚀 Teknofest Standartlarında Kapsamlı Raporu Hazırla", use_container_width=True, type="primary"):
         if not proje_aciklamasi or not proje_adi:
-            st.warning("Lütfen Proje Adı ve Açıklamasını doldurun.")
+            st.warning("Lütfen alanları doldurun.")
         else:
-            with st.status("🛠️ Raporunuz hazırlanıyor, lütfen bekleyiniz...", expanded=True) as status:
-                st.write("Yapay zeka şu an düşünen modda en iyi işi çıkarmaya çalışıyor...")
-                st.write(f"Raporunuz {hedef_sayfa} sayfa kuralına göre optimize ediliyor. Lütfen ayrılmayınız...")
-                
+            with st.status("🛠️ Rapor hazırlanıyor...", expanded=True) as status:
+                st.write("Yapay zeka şu an en insansı modu kurgulamak için düşünüyor...")
                 try:
                     genai.configure(api_key=GEMINI_API_KEY)
-                    models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                    model = genai.GenerativeModel(next((m for m in models if "flash" in m), models[0]))
-                    
-                    hedef_kelime = hedef_sayfa * 450
-                    prompt = f"""
-                    Sen Teknofest danışmanısın. {seviye} seviyesi için {kategori} kategorisinde TAM {hedef_sayfa} SAYFA (Yaklaşık {hedef_kelime} kelime) rapor yaz.
-                    MOD: {yazim_modu} (Anti-Dedektör ise insansı ve akademik yaz). HTML veya Markdown (** veya ##) işaretleri KESİNLİKLE kullanma.
-                    BÖLÜMLER: Özet (250 kelime), Problem, Çözüm, Özgün Değer, Hedef Kitle, Maliyet, Takvim.
-                    İçerik: {proje_adi} - {proje_aciklamasi}. Hikaye: {ozgunluk}
-                    """
-                    
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    prompt = f"Sen Teknofest danışmanısın. {seviye} seviyesi için {kategori} kategorisinde {hedef_sayfa} sayfalık akademik bir ÖDR yaz. MOD: {yazim_modu}. Markdown işaretleri kullanma. İçerik: {proje_adi} - {proje_aciklamasi}. Özgünlük: {ozgunluk}"
                     response = model.generate_content(prompt)
                     st.session_state.rapor_metni = response.text
-                    st.session_state.proje_adi_state = proje_adi
+                    st.session_state.p_adi = proje_adi
                     st.session_state.rapor_hazir = True
-                    status.update(label="✅ Rapor Başarıyla Hazırlandı!", state="complete", expanded=False)
-                except Exception as e:
-                    st.error(f"Hata: {str(e)}")
+                    status.update(label="✅ Rapor Hazır!", state="complete")
+                except Exception as e: st.error(str(e))
 
-# --- 5. SONUÇ, GÖRSEL RAPOR VE İSTATİSTİKLER ---
-if "rapor_hazir" in st.session_state and st.session_state.rapor_hazir:
-    st.markdown("---")
+# --- 5. SONUÇ VE ÖZEL YAZDIRMA EKRANI ---
+if "rapor_hazir" in st.session_state:
     metin = st.session_state.rapor_metni
-    p_adi = st.session_state.proje_adi_state
+    p_adi = st.session_state.p_adi
+    temiz_metin = metin.replace("**", "").replace("##", "")
     
-    # Markdown işaretlerini önizleme için de temizleyelim
-    temiz_metin = metin.replace("**", "").replace("##", "").replace("#", "")
-    
-    # İstatistik Paneli
-    col_st1, col_st2, col_st3 = st.columns(3)
-    col_st1.metric("Toplam Kelime", len(metin.split()))
-    col_st2.metric("Savunma Durumu", "Aktif" if "Anti-Dedektör" in yazim_modu else "Pasif")
-    col_st3.metric("Karakter Sağlığı", "Güvenli (UTF-8)")
-    
-    # DİJİTAL RAPOR SAYFASI GÖRÜNÜMÜ
-    st.markdown("### 📄 Rapor Önizleme")
-    st.markdown(f"""
-    <div style="background-color: white; padding: 40px; color: black; border: 1px solid #ddd; border-radius: 5px; font-family: Arial; line-height: 1.6; text-align: justify; height: 500px; overflow-y: scroll;">
-        <h2 style="text-align: center; border-bottom: 2px solid #1E3A8A; padding-bottom: 10px;">{p_adi.upper()}</h2>
-        <p>{temiz_metin.replace('\n', '<br>')}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # İndirme ve İşlem Düğmeleri
+    st.markdown("---")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Kelime", len(metin.split()))
+    c2.metric("Savunma", "Aktif")
+    c3.metric("Karakter", "Güvenli")
+
+    st.markdown(f"""<div id='print_area' style='background:white; padding:30px; color:black; border:1px solid #ddd; font-family:Arial; line-height:1.6; text-align:justify;'>
+    <h2 style='text-align:center;'>{p_adi.upper()}</h2><p>{temiz_metin.replace('\n', '<br>')}</p></div>""", unsafe_allow_html=True)
+
     st.markdown("### 📥 İşlemler")
-    c_down1, c_down2, c_down3 = st.columns(3)
-    
-    with c_down1:
-        # Hata burada düzeltildi: temiz_metin değişkeni kullanılıyor
-        pdf_bytes = create_pdf(temiz_metin, p_adi)
-        st.download_button("📥 PDF Olarak İndir", pdf_bytes, f"{p_adi}.pdf", use_container_width=True)
-    with c_down2:
-        word_bytes = create_word(temiz_metin, p_adi)
-        st.download_button("📥 Word Olarak İndir", word_bytes, f"{p_adi}.docx", use_container_width=True)
-    with c_down3:
+    d1, d2, d3 = st.columns(3)
+    with d1: st.download_button("📥 PDF İndir", create_pdf(temiz_metin, p_adi), f"{p_adi}.pdf", use_container_width=True)
+    with d2: st.download_button("📥 Word İndir", create_word(temiz_metin, p_adi), f"{p_adi}.docx", use_container_width=True)
+    with d3:
         if st.button("🖨️ Raporu Yazdır", use_container_width=True):
-            components.html("<script>window.print();</script>", height=0)
+            print_html = f"<html><head><title>Yazdır</title><style>body{{font-family:Arial; padding:50px; line-height:1.6;}} h2{{text-align:center;}}</style></head><body><h2>{p_adi}</h2><p>{temiz_metin.replace('\n', '<br>')}</p><script>window.print();</script></body></html>"
+            components.html(f"<iframe srcdoc=\"{print_html.replace('"', '&quot;')}\" style='display:none;'></iframe>", height=0)
+            st.info("Yazdırma penceresi tetiklendi. (Eğer açılmazsa PDF indirip yazdırınız.)")
 
-    # E-posta Gönderme Alanı
-    email_user = st.text_input("📩 Raporu E-Postana Gönder", placeholder="E-posta adresinizi yazın...")
-    if st.button("E-Posta Gönder", use_container_width=True):
-        st.success(f"Rapor taslağı {email_user} adresine e-posta olarak gönderilmek üzere sıraya alındı.")
+    st.markdown("---")
+    email = st.text_input("📩 E-posta Taslağı Oluştur", placeholder="Adresinizi yazın...")
+    if st.button("E-posta Gönder (Taslak Hazırla)", use_container_width=True):
+        st.info("Not: Güvenlik nedeniyle dosya otomatik eklenemez. Lütfen metni kopyalayıp e-postanıza yapıştırın.")
+        mailto_link = f"mailto:{email}?subject={urllib.parse.quote(p_adi)}%20Raporu&body={urllib.parse.quote(metin[:500])}..."
+        st.link_button("📧 E-postayı Aç ve Metni Yapıştır", mailto_link, use_container_width=True)
 
-    # E-tabloya Kayıt (Hücre sınırı korumalı)
-    try:
-        sheet = connect_sheets()
-        if sheet:
-            sheet.append_row([str(datetime.now()), yazim_modu, p_adi, temiz_metin[:30000]])
-    except: pass
-
-# --- 6. SİSTEM DÜĞMELERİ ---
+# --- 6. SİSTEM VE FOOTER ---
 st.markdown("---")
-c_sys1, c_sys2 = st.columns(2)
-with c_sys1:
-    if st.button("🔄 Yeni Rapor (Sıfırla)", use_container_width=True):
+col_b1, col_b2 = st.columns(2)
+with col_b1:
+    if st.button("🔄 Yeni Rapor", use_container_width=True):
         st.session_state.clear()
         st.rerun()
-with c_sys2:
-    app_link = "https://teknorapor-derepazari.streamlit.app"
-    davet = f"🚀 Teknofest projelerinizi hazırlamak için Hüsamettin KAYMAKÇI tarafından sunulan bu sistemi kullanın:\n\n🔗 {app_link}"
-    st.link_button("🟢 Sistemi WhatsApp'ta Paylaş", f"https://wa.me/?text={urllib.parse.quote(davet)}", use_container_width=True)
+with col_b2:
+    davet = f"🚀 Teknofest projelerinizi hazırlamak için Hüsamettin KAYMAKÇI tarafından sunulan bu sistemi kullanın:\n\n🔗 https://teknorapor-derepazari.streamlit.app"
+    st.link_button("🟢 Sistemi Paylaş", f"https://wa.me/?text={urllib.parse.quote(davet)}", use_container_width=True)
 
-# --- FOOTER (GÜNCEL İLETİŞİM) ---
-st.markdown(f"""
-<p style='text-align: center; color: gray; font-size: 0.9em;'>
-    Derepazarı İlçe MEM Arge Birimi © 2026<br>
-    <b>Hazırlayan: Hüsamettin KAYMAKÇI</b><br>
-    E-Posta: <a href='mailto:sosyalcinet@gmail.com'>sosyalcinet@gmail.com</a> | 
-    Telegram: <a href='https://t.me/sosyalcinet'>@sosyalcinet</a>
-</p>
-""", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align:center; color:gray;'>Derepazarı İlçe MEM Arge Birimi © 2026<br><b>Hazırlayan: Hüsamettin KAYMAKÇI</b><br><a href='mailto:sosyalcinet@gmail.com'>sosyalcinet@gmail.com</a> | <a href='https://t.me/sosyalcinet'>@sosyalcinet</a></p>", unsafe_allow_html=True)
