@@ -7,31 +7,41 @@ from fpdf import FPDF
 from io import BytesIO
 from datetime import datetime
 
-# --- 1. SEÇENEK LİSTELERİ ---
-TEMALAR = {
-    "Sağlık ve İlk Yardım": ["Engelli Dostu", "Sağlıklı Yaşam", "Hastalık Takibi", "Yaşlı Bakımı", "İlk Yardım Teknolojileri"],
-    "Afet Yönetimi": ["Deprem", "Sel", "Yangın", "Tahliye Sistemleri", "Arama Kurtarma", "Erken Uyarı Sistemleri"],
-    "Sosyal İnovasyon": ["Dezavantajlı Gruplar", "Eğitim Teknolojileri", "Aile ve Çocuk", "Toplumsal Farkındalık", "Göç ve Uyum"]
+# --- 1. TEKNOFEST SEVİYE BAZLI VERİ MATRİSİ ---
+LEVEL_DATA = {
+    "İlkokul": {
+        "Temalar": {
+            "Sosyal İnovasyon": ["Eğitimde Yardımcı Araçlar", "Okul Yaşamı", "Oyunla Öğrenme", "Çevre Bilinci"],
+            "Sağlık ve İlk Yardım": ["Kişisel Hijyen", "Sağlıklı Beslenme", "Çocuk Güvenliği"],
+            "Afet Yönetimi": ["Okul Tahliye Farkındalığı", "Temel Afet Bilinci"]
+        },
+        "Hedef_Kitle": ["İlkokul Öğrencileri", "Öğretmenler", "Veliler", "Okul Çalışanları"]
+    },
+    "Ortaokul": {
+        "Temalar": {
+            "Sosyal İnovasyon": ["Dezavantajlı Gruplar", "Toplumsal Yardımlaşma", "Eğitim Teknolojileri", "Erişilebilirlik"],
+            "Sağlık ve İlk Yardım": ["Hastalık Takibi", "Engelli Dostu Çözümler", "Sporcu Sağlığı"],
+            "Afet Yönetimi": ["Arama Kurtarma Destek", "Erken Uyarı Düzenekleri", "Geçici Barınma Çözümleri"]
+        },
+        "Hedef_Kitle": ["Ortaokul ve Lise Öğrencileri", "Bedensel Engelli Bireyler", "Yaşlılar", "Afetzedeler"]
+    },
+    "Lise": {
+        "Temalar": {
+            "Sosyal İnovasyon": ["Mülteci ve Göçmen Uyumu", "İstihdam Çözümleri", "Sürdürülebilir Şehirler", "Fırsat Eşitliği"],
+            "Sağlık ve İlk Yardım": ["Biyomedikal Teknolojiler", "Giyilebilir Sağlık Cihazları", "Akıllı İlaç Takibi"],
+            "Afet Yönetimi": ["İnsansız Arama Kurtarma", "Kriz Yönetim Yazılımları", "Lojistik Destek Sistemleri"]
+        },
+        "Hedef_Kitle": ["Sektörel Uzmanlar", "Kronik Hastalar", "Yerel Yönetimler", "Görme/İşitme Engelli Bireyler", "Profesyonel Kurtarma Ekipleri"]
+    }
 }
-
-HEDEF_KITLELER = [
-    "Engelli Bireyler", 
-    "Yaşlılar ve Bakıma Muhtaç Kişiler", 
-    "Öğrenciler ve Eğitimciler", 
-    "Afetzedeler ve Arama Kurtarma Ekipleri", 
-    "Sağlık Çalışanları ve Hastalar",
-    "Düşük Gelirli Gruplar",
-    "Çocuklar ve Ebeveynler",
-    "Toplumun Geneli (Sosyal Farkındalık)"
-]
 
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 except:
-    st.error("Kasa (Secrets) ayarlarında API anahtarı bulunamadı!")
+    st.error("Secrets ayarlarında API anahtarı bulunamadı!")
     st.stop()
 
-st.set_page_config(page_title="TeknoRapor V6 | Resmi Şablon", layout="centered", page_icon="🤖")
+st.set_page_config(page_title="TeknoRapor V7 | Akıllı Filtre", layout="centered", page_icon="🤖")
 
 # --- FORMATLAMA FONKSİYONLARI ---
 def create_word(text, title):
@@ -40,13 +50,11 @@ def create_word(text, title):
     p = doc.add_paragraph(text.replace("**", "").replace("##", "").replace("#", ""))
     style = doc.styles['Normal']
     font = style.font
-    font.name = 'Arial'
-    font.size = Pt(12)
+    font.name = 'Arial'; font.size = Pt(12)
     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p.paragraph_format.line_spacing = 1.15 # Şartnameye uygun 1.15 aralık
+    p.paragraph_format.line_spacing = 1.15
     bio = BytesIO()
-    doc.save(bio)
-    return bio.getvalue()
+    doc.save(bio); return bio.getvalue()
 
 def create_pdf(text, title):
     pdf = FPDF()
@@ -58,24 +66,27 @@ def create_pdf(text, title):
     return pdf.output(dest='S').encode('latin-1')
 
 # --- ARAYÜZ ---
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Resmi ÖDR Robotu V6</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Resmi ÖDR Robotu V7</h1>", unsafe_allow_html=True)
 
 with st.expander("⚙️ Rapor Derinliği", expanded=True):
     hedef_sayfa = st.radio("Sayfa Sayısı", options=[1, 2, 3, 4, 5, 6], index=2, horizontal=True)
 
-with st.expander("📝 Proje Bilgileri (Resmi Seçenekli Sistem)", expanded=True):
+with st.expander("📝 Proje Bilgileri (Akıllı Filtreli)", expanded=True):
+    # 1. SEVİYE SEÇİMİ (Ana Tetikleyici)
+    seviye = st.selectbox("Eğitim Seviyesi Seçin", ["İlkokul", "Ortaokul", "Lise"])
+    
     col1, col2 = st.columns(2)
     with col1:
-        seviye = st.selectbox("Eğitim Seviyesi", ["İlkokul", "Ortaokul", "Lise"])
         proje_adi = st.text_input("Proje Adı", placeholder="Örn: Bulut Kumbarası")
-        ana_tema = st.selectbox("Ana Tema", list(TEMALAR.keys()))
-        alt_tema = st.selectbox("Alt Tema", TEMALAR[ana_tema])
+        # SEVİYEYE GÖRE TEMA FİLTRESİ
+        ana_tema = st.selectbox("Ana Tema", list(LEVEL_DATA[seviye]["Temalar"].keys()))
+        alt_tema = st.selectbox("Alt Tema", LEVEL_DATA[seviye]["Temalar"][ana_tema])
         
     with col2:
         danisman = st.text_input("Danışman Adı")
         takim = st.text_input("Takım Adı")
-        # HEDEF KİTLE SEÇİMİ
-        hedef_kitle = st.selectbox("Hedef Kitle Seçin", HEDEF_KITLELER)
+        # SEVİYEYE GÖRE HEDEF KİTLE FİLTRESİ
+        h_kitle = st.selectbox("Hedef Kitle", LEVEL_DATA[seviye]["Hedef_Kitle"])
         takim_id = st.text_input("Takım/Başvuru ID")
 
     aciklama = st.text_area("Proje Özeti ve Kapsamı (Buraya ana fikrinizi yazın)", height=150)
@@ -84,36 +95,33 @@ with st.expander("📝 Proje Bilgileri (Resmi Seçenekli Sistem)", expanded=True
         if not aciklama:
             st.warning("Lütfen proje fikrinizi kısaca açıklayın.")
         else:
-            with st.status("🛠️ Şartname kriterleri analiz ediliyor...", expanded=True) as status:
+            with st.status(f"🛠️ {seviye} Seviyesi Kriterleri Analiz Ediliyor...", expanded=True) as status:
                 try:
                     genai.configure(api_key=GEMINI_API_KEY)
                     model = genai.GenerativeModel('gemini-1.5-flash')
                     
-                    p_name = proje_adi if proje_adi else "[BURAYA PROJE ADINI YAZINIZ]"
-                    d_name = danisman if danisman else "[BURAYA DANIŞMAN ADINI YAZINIZ]"
-                    t_name = takim if takim else "[BURAYA TAKIM ADINI YAZINIZ]"
-                    id_no = takim_id if takim_id else "[BURAYA ID YAZINIZ]"
+                    p_name = proje_adi if proje_adi else "[PROJE ADI]"
+                    d_name = danisman if danisman else "[DANIŞMAN ADI]"
+                    t_name = takim if takim else "[TAKIM ADI]"
+                    id_no = takim_id if takim_id else "[ID]"
 
                     prompt = f"""
-                    Sen bir Teknofest jürisisin. {seviye} seviyesi için {ana_tema} ana teması ve {alt_tema} alt temasında bir ÖDR yazacaksın.
-                    HEDEF KİTLE: {hedef_kitle}. 
-                    Puanlama Kriterleri: Özet (20p), Problem (35p), Özgünlük (24p), Yöntem (12p), Takım (3p), Kaynaklar (3p).
+                    Sen profesyonel bir Teknofest {seviye} seviyesi danışmanısın. 
+                    {ana_tema} ana teması ve {alt_tema} alt temasında, {h_kitle} hedef kitlesine yönelik bir ÖDR yaz.
+                    Puanlama: Özet (20p), Problem (35p), Özgünlük (24p), Yöntem (12p), Takım (3p), Kaynaklar (3p).
                     Format: Arial 12pt, 1.15 aralık. Markdown kullanma.
                     
                     BAŞLIKLAR:
-                    PROJE ADI: {p_name}
-                    DANIŞMAN: {d_name}
-                    TAKIM: {t_name}
-                    ID: {id_no}
-                    TEMA: {ana_tema} / {alt_tema}
-                    HEDEF KİTLE: {hedef_kitle}
+                    PROJE ADI: {p_name} | DANIŞMAN: {d_name} | TAKIM: {t_name} | ID: {id_no}
+                    SEVİYE/TEMA: {seviye} / {ana_tema} - {alt_tema}
+                    HEDEF KİTLE: {h_kitle}
                     ---
                     BÖLÜMLER:
-                    1. PROJE ÖZETİ (Amacı, Kapsamı, Hedef Kitle: {hedef_kitle})
+                    1. PROJE ÖZETİ (Amacı, Kapsamı, Hedef Kitle: {h_kitle})
                     2. PROBLEMİN TANIMI VE ÇÖZÜM ÖNERİSİ
-                    3. ÖZGÜNLÜK VE UYGULANABİLİRLİK
+                    3. ÖZGÜNLÜK VE UYGULANABİLİRLİK (Akademik dille)
                     4. ÇALIŞMA YÖNTEMİ VE SÜREÇ
-                    5. PROJE TAKIMI VE GÖREV DAĞILIMI
+                    5. PROJE TAKIMI (Görev dağılımı anlatımı)
                     6. KAYNAKLAR
                     
                     İçerik Temeli: {aciklama}
@@ -122,9 +130,8 @@ with st.expander("📝 Proje Bilgileri (Resmi Seçenekli Sistem)", expanded=True
                     st.session_state.rapor = response.text
                     st.session_state.p_adi = p_name
                     st.session_state.hazir = True
-                    status.update(label="✅ Rapor Şartnameye Uygun Hazırlandı!", state="complete")
-                except Exception as e:
-                    st.error(f"Sistem Hatası: {str(e)}")
+                    status.update(label="✅ Rapor Hazır!", state="complete")
+                except Exception as e: st.error(str(e))
 
 # --- SONUÇ ---
 if "hazir" in st.session_state:
