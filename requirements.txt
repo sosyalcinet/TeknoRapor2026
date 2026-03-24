@@ -3,4 +3,3 @@ google-generativeai
 gspread
 oauth2client
 fpdf2
-python-docx
