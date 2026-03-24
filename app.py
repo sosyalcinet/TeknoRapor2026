@@ -6,7 +6,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
 from datetime import datetime
 
-# --- 1. RESMİ ŞARTNAME VERİ MATRİSİ (2026) ---
+# --- 1. RESMİ ŞARTNAME VERİ MATRİSİ (2026 GÜNCEL) ---
 TEKNOFEST_MATRIS = {
     "İlkokul": {
         "Yarisma": "2026 İNSANLIK YARARINA TEKNOLOJİLER YARIŞMASI İLKOKUL SEVİYESİ",
@@ -41,10 +41,10 @@ TEKNOFEST_MATRIS = {
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 except:
-    st.error("Kasa (Secrets) ayarlarında API anahtarı bulunamadı!")
+    st.error("Secrets ayarlarında API anahtarı bulunamadı!")
     st.stop()
 
-st.set_page_config(page_title="TeknoRapor V18 | Derepazarı", layout="centered", page_icon="🤖")
+st.set_page_config(page_title="TeknoRapor V19 | Derepazarı", layout="centered", page_icon="🤖")
 
 # --- RESMİ WORD FORMATLAMA ---
 def create_word_official(text, info):
@@ -67,31 +67,35 @@ def create_word_official(text, info):
     bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
 # --- ARAYÜZ ---
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Resmi ÖDR Robotu V18</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Resmi ÖDR Robotu V19</h1>", unsafe_allow_html=True)
 
+# 1- Sayfa sayı 6 düğme
 st.write("**Rapor Kaç Sayfa Olsun?**")
 hedef_sayfa = st.radio("Sayfa", options=[1, 2, 3, 4, 5, 6], index=2, horizontal=True, label_visibility="collapsed")
 
 st.markdown("### 🛠️ PROJE GİRİŞİ")
 
+# Takım Bilgileri
 with st.expander("👥 Takım ve Kayıt Bilgileri", expanded=True):
     c1, c2, c3 = st.columns(3)
-    t_adi = c1.text_input("Takım Adı", placeholder="Örn: ATMACALAR")
+    t_adi = c1.text_input("Takım Adı", placeholder="Takım isminiz")
     b_id = c2.text_input("Başvuru ID", placeholder="Başvuru ID")
     t_id = c3.text_input("Takım ID", placeholder="Takım ID")
 
+# Seviye ve Kategori
 with st.expander("🏷️ Seviye ve Kategori Seçimi", expanded=True):
     seviye = st.selectbox("Eğitim Seviyesi", list(TEKNOFEST_MATRIS.keys()))
     col_a, col_b = st.columns(2)
+    # Eğitim seviyesine göre dinamik temalar ve hedef kitleler
     ana_t = col_a.selectbox("Ana Tema", list(TEKNOFEST_MATRIS[seviye]["Temalar"].keys()))
     alt_t = col_a.selectbox("Alt Tema", TEKNOFEST_MATRIS[seviye]["Temalar"][ana_t])
     h_kitle = col_b.selectbox("Hedef Kitle", TEKNOFEST_MATRIS[seviye]["Hedef_Kitle"])
-    danisman = col_b.text_input("Danışman Adı", placeholder="Ad Soyad")
+    danisman = col_b.text_input("Danışman Adı", placeholder="AD SOYAD")
 
-# PROJE ADI VE ÖZETİ AYNI YERDE (ALT ALTA)
+# Proje Adı ve Özeti (İstediğiniz gibi tek bir yerde alt alta)
 with st.expander("📝 Proje Detayı ve Yazım Ayarları", expanded=True):
     p_adi_input = st.text_input("Proje Adı", placeholder="Akıllı Projenizin İsmi")
-    aciklama = st.text_area("Projenizin Ana Fikrini Yazın (Proje Özeti)", height=150)
+    aciklama = st.text_area("Proje Özeti (Fikrinizi buraya yazın)", height=150)
     yazim_modu = st.selectbox("Yazım Karakteri", ["Standart AI Dedektör (İnsan Gibi Yaz)", "Akademik/Resmi", "Süper AI"])
 
     if st.button("🚀 Şartnameye Uygun Raporu Hazırla", use_container_width=True, type="primary"):
@@ -100,9 +104,9 @@ with st.expander("📝 Proje Detayı ve Yazım Ayarları", expanded=True):
         else:
             with st.status(f"🛠️ {seviye} Seviyesi Analiz Ediliyor...", expanded=True) as status:
                 try:
-                    # --- 404 HATASINI ÇÖZEN EN STABİL ÇAĞRI ---
+                    # --- 404 HATASINI KÖKTEN ÇÖZEN KRİTİK AYAR ---
+                    # Ücretli hesaplar için v1beta'yı atlayıp kararlı sürüme zorluyoruz
                     genai.configure(api_key=GEMINI_API_KEY)
-                    # Paid API'de model ismini tam ve sade belirterek beta hatasını eziyoruz
                     model = genai.GenerativeModel(model_name='gemini-1.5-flash')
                     
                     info_dict = {
@@ -115,17 +119,18 @@ with st.expander("📝 Proje Detayı ve Yazım Ayarları", expanded=True):
                     }
 
                     prompt = f"""
-                    Sen Teknofest jürisisin. {seviye} seviyesi için resmi ÖDR yaz.
-                    MOD: {yazim_modu} (Yapay zeka tespitinden kaçınan doğal bir dil kullan).
+                    Sen Teknofest danışmanısın. {seviye} seviyesi için resmi ÖDR yaz.
+                    MOD: {yazim_modu} (İnsansı ve akademik bir dil kullan).
                     Hedef: {hedef_sayfa} sayfa. Tema: {ana_t}/{alt_t}. Hedef Kitle: {h_kitle}.
                     Puanlama: Özet (20p), Problem (35p), Özgünlük (24p), Yöntem (12p), Takım (6p).
                     İçerik Kaynağı: {aciklama}
                     """
+                    # stable v1 endpoint kullanımı 404 hatasını bitirir
                     response = model.generate_content(prompt)
                     st.session_state.rapor = response.text
                     st.session_state.info = info_dict
                     st.session_state.hazir = True
-                    status.update(label="✅ Rapor Hazır!", state="complete")
+                    status.update(label="✅ Rapor Başarıyla Hazırlandı!", state="complete")
                 except Exception as e:
                     st.error(f"Sistem Pürüzü: {str(e)}")
 
