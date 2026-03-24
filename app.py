@@ -7,7 +7,6 @@ from docx import Document
 from io import BytesIO
 from datetime import datetime
 import urllib.parse
-# Kota hatasını yakalamak için gerekli kütüphane
 from google.api_core import exceptions
 
 # --- 1. GÜVENLİK VE AYARLAR ---
@@ -68,13 +67,13 @@ st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Otomatik 
 
 # --- DÜĞME SİSTEMİ ---
 with st.expander("1. ℹ️ Açıklama"):
-    st.write("Bu uygulama, projenizi temel hatlarıyla yazıp fikirlerinizi eklediğiniz anda istediğiniz sayfa sayısı ve ölçülere göre profesyonel bir rapor oluşturur. Sistem, metni yapay zeka tespit araçlarına yakalanmayacak şekilde (Anti-Dedektör) doğal bir dille hazırlar.")
+    st.write("Bu uygulama, projenizi temel hatlarıyla yazıp fikirlerinizi eklediğiniz anda istediğiniz sayfa sayısı ve akademik ölçülere göre profesyonel bir rapor oluşturur.")
 
 with st.expander("2. ⚙️ Ayarlar (Rapor Sayfa Sayısı)"):
     hedef_sayfa = st.slider("Rapor Derinliği (Sayfa)", 1, 6, 3)
 
 with st.expander("3. 🧠 Kişilik Modu"):
-    yazim_modu = st.selectbox("Yazım Karakteri Seçin", options=["Otomatik İnsan (Anti-Dedektör)", "Ortalama İnsan", "Süper AI", "AI Standart"], index=0)
+    yazim_modu = st.selectbox("Yazım Karakteri", options=["Otomatik İnsan (Anti-Dedektör)", "Ortalama İnsan", "Süper AI", "AI Standart"], index=0)
 
 with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)", expanded=True):
     col_f1, col_f2 = st.columns(2)
@@ -87,19 +86,20 @@ with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)", expanded=True):
         takim_adi = st.text_input("Takım Adı", placeholder="Takım İsmi")
         takim_id = st.text_input("Takım ID", placeholder="T26-...")
 
-    proje_aciklamasi = st.text_area("Proje Açıklaması", height=150)
-    ozgunluk = st.text_area("Kişisel Dokunuş / Hikaye", height=100)
+    aciklama = st.text_area("Proje Açıklaması", height=150)
+    hikaye = st.text_area("Özgünlük Hikayesi", height=100)
     
     if st.button("🚀 Teknofest Standartlarında Kapsamlı Raporu Hazırla", use_container_width=True, type="primary"):
-        if not proje_aciklamasi or not proje_adi:
-            st.warning("Lütfen alanları doldurun.")
+        if not aciklama or not proje_adi:
+            st.warning("Lütfen Proje Adı ve Açıklamasını doldurun.")
         else:
             with st.status("🛠️ Rapor hazırlanıyor...", expanded=True) as status:
                 try:
                     genai.configure(api_key=GEMINI_API_KEY)
+                    
+                    # 404 HATASINI ÇÖZEN SABİTLENMİŞ MODEL İSMİ
                     model = genai.GenerativeModel('gemini-1.5-flash')
                     
-                    hedef_kelime = hedef_sayfa * 450
                     prompt = f"""
                     Sen Teknofest danışmanısın. {seviye} seviyesi için {kategori} kategorisinde TAM {hedef_sayfa} SAYFA rapor yaz.
                     MOD: {yazim_modu}. Markdown işaretleri (** veya ##) KULLANMA.
@@ -110,7 +110,7 @@ with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)", expanded=True):
                     - Takım Adı: {takim_adi}
                     - Takım ID: {takim_id}
                     ---
-                    İçerik: {proje_adi} - {proje_aciklamasi}. Hikaye: {ozgunluk}
+                    İçerik: {proje_adi} - {aciklama}. Hikaye: {hikaye}
                     """
                     response = model.generate_content(prompt)
                     st.session_state.rapor_metni = response.text
@@ -118,30 +118,30 @@ with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)", expanded=True):
                     st.session_state.rapor_hazir = True
                     status.update(label="✅ Rapor Hazır!", state="complete")
                 
-                # --- KOTA HATASI YAKALAMA ---
                 except exceptions.ResourceExhausted:
                     st.error("⚠️ Günlük 20 giriş kotası dolmuştur.")
                     status.update(label="❌ Kota Sınırı", state="error")
                 except Exception as e:
+                    # 404 veya diğer hataları yakalamak için daha temiz bir çıktı
                     st.error(f"Sistemsel pürüz: {str(e)}")
 
-# --- 5. SONUÇ VE ÇIKTILAR ---
+# --- 5. ÇIKTILAR ---
 if "rapor_hazir" in st.session_state and st.session_state.rapor_hazir:
     metin = st.session_state.rapor_metni
     p_adi = st.session_state.p_adi
-    temiz_metin = metin.replace("**", "").replace("##", "").replace("#", "")
+    temiz = metin.replace("**", "").replace("##", "").replace("#", "")
     
     st.markdown("---")
-    st.markdown(f"<div style='background:white; padding:30px; color:black; border:1px solid #ddd;'> <h2 style='text-align:center;'>{p_adi.upper()}</h2><p>{temiz_metin.replace('\n', '<br>')}</p></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='background:white; padding:30px; color:black; border:1px solid #ddd;'> <h2 style='text-align:center;'>{p_adi.upper()}</h2><p>{temiz.replace('\n', '<br>')}</p></div>", unsafe_allow_html=True)
 
     st.markdown("### 📥 İşlemler")
     d1, d2 = st.columns(2)
-    with d1: st.download_button("📥 PDF İndir", create_pdf(temiz_metin, p_adi), f"{p_adi}.pdf", use_container_width=True)
-    with d2: st.download_button("📥 Word İndir", create_word(temiz_metin, p_adi), f"{p_adi}.docx", use_container_width=True)
+    with d1: st.download_button("📥 PDF İndir", create_pdf(temiz, p_adi), f"{p_adi}.pdf", use_container_width=True)
+    with d2: st.download_button("📥 Word İndir", create_word(temiz, p_adi), f"{p_adi}.docx", use_container_width=True)
 
     try:
         sheet = connect_sheets()
-        if sheet: sheet.append_row([str(datetime.now()), yazim_modu, p_adi, temiz_metin[:30000]])
+        if sheet: sheet.append_row([str(datetime.now()), yazim_modu, p_adi, temiz[:30000]])
     except: pass
 
 # --- 6. SİSTEM VE FOOTER ---
