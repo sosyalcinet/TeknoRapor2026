@@ -6,8 +6,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
 from datetime import datetime
 
-# --- 1. RESMİ ŞARTNAME VERİ MATRİSİ (2026 GÜNCEL) ---
-# Şartnamelerden çekilen dinamik veriler 
+# --- 1. RESMİ ŞARTNAME VERİ MATRİSİ (2026) ---
 TEKNOFEST_MATRIS = {
     "İlkokul": {
         "Yarisma": "2026 İNSANLIK YARARINA TEKNOLOJİLER YARIŞMASI İLKOKUL SEVİYESİ",
@@ -21,9 +20,9 @@ TEKNOFEST_MATRIS = {
     "Ortaokul": {
         "Yarisma": "2026 İNSANLIK YARARINA TEKNOLOJİLER YARIŞMASI ORTAOKUL SEVİYESİ",
         "Temalar": {
-            "Astronomi ve Uzay Teknolojileri": ["Uzay Araçları ve Keşif", "Gezegenler ve Uzayda Yaşam", "Gözlem Teknolojileri", "Evreni Keşfetmek"],
+            "Astronomi ve Uzay Teknolojileri": ["Uzay Araçları ve Keşif Sistemleri", "Gezegenler ve Uzayda Yaşam Olasılığı", "Uzay Araştırmaları ve Gözlem Teknolojileri", "Gökyüzü ve Evreni Keşfetmek"],
             "Doğa Bilimleri ve Çevresel Farkındalık": ["Akıllı Şehirler", "Ekosistemler", "Afetler ve Güvenli Yaşam", "Enerji Kaynakları", "Atık Yönetimi"],
-            "Sağlık ve İyi Yaşam Teknolojileri": ["Beslenme ve Gıda", "Hareketli Yaşam", "Günlük Sağlık", "Zihinsel Sağlık", "Engelsiz Yaşam"],
+            "Sağlık ve İyi Yaşam Teknolojileri": ["Beslenme ve Gıda", "Hareketli Yaşam", "Günlük Sağlık Teknolojileri", "Zihinsel Sağlık", "Engelsiz Yaşam"],
             "Eğitim Teknolojileri": ["Dijital Araçlar", "Oyunlaştırma", "Dijital Güvenlik", "Öğrenmeyi Kolaylaştıran Çözümler"]
         },
         "Hedef_Kitle": ["Ortaokul Öğrencileri", "Bedensel Engelliler", "Yaşlılar", "Afetzedeler"]
@@ -45,12 +44,11 @@ except:
     st.error("Kasa (Secrets) ayarlarında API anahtarı bulunamadı!")
     st.stop()
 
-st.set_page_config(page_title="TeknoRapor V15 | Derepazarı", layout="centered", page_icon="🤖")
+st.set_page_config(page_title="TeknoRapor V16 | Derepazarı", layout="centered", page_icon="🤖")
 
 # --- RESMİ WORD FORMATLAMA (Arial 12pt, 1.15 Aralık) ---
 def create_word_official(text, info):
     doc = Document()
-    # 1. SAYFA: KAPAK [cite: 1536-1539, 1651-1654, 1766-1769]
     h_yarisma = doc.add_heading(info['y_adi'], 0)
     h_yarisma.alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_heading("ÖN DEĞERLENDİRME RAPORU", 1).alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -58,11 +56,9 @@ def create_word_official(text, info):
     p.add_run(f"\nKATEGORİ: {info['kategori']}\nTAKIM ADI: {info['takim']}\nBAŞVURU ID: {info['b_id']}\nTAKIM ID: {info['t_id']}").bold = True
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_page_break()
-    # 2. SAYFA: İÇİNDEKİLER [cite: 1546, 1661, 1776]
     doc.add_heading("İÇİNDEKİLER", 1)
     doc.add_paragraph("1. PROJE ÖZETİ\n2. PROBLEMİN TANIMI VE ÇÖZÜM ÖNERİSİ\n3. ÖZGÜNLÜK VE UYGULANABİLİRLİK\n4. YÖNTEM VE SÜREÇ\n5. PROJE TAKIMI\n6. KAYNAKLAR")
     doc.add_page_break()
-    # 3. SAYFA: İÇERİK (Arial 12, 1.15 Aralık) 
     content = doc.add_paragraph(text.replace("**", "").replace("##", ""))
     style = doc.styles['Normal']
     style.font.name = 'Arial'; style.font.size = Pt(12)
@@ -71,18 +67,18 @@ def create_word_official(text, info):
     bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
 # --- ARAYÜZ ---
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Resmi ÖDR Robotu V15</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Resmi ÖDR Robotu V16</h1>", unsafe_allow_html=True)
 
-# 1- Sayfa sayı 6 düğme
+# Sayfa Derinliği - 6 Düğme
 st.write("**Rapor Kaç Sayfa Olsun?**")
 hedef_sayfa = st.radio("Sayfa", options=[1, 2, 3, 4, 5, 6], index=2, horizontal=True, label_visibility="collapsed")
 
 st.markdown("### 🛠️ PROJE GİRİŞİ")
 
-# TAKIM, BAŞVURU VE ID (Birbirine yakın)
+# TAKIM VE ID (Yan yana)
 with st.expander("👥 Takım ve Kayıt Bilgileri", expanded=True):
     c1, c2, c3 = st.columns(3)
-    t_adi = c1.text_input("Takım Adı", placeholder="Takım isminiz")
+    t_adi = c1.text_input("Takım Adı", placeholder="Örn: ATMACALAR")
     b_id = c2.text_input("Başvuru ID", placeholder="Başvuru ID")
     t_id = c3.text_input("Takım ID", placeholder="Takım ID")
 
@@ -93,24 +89,23 @@ with st.expander("🏷️ Seviye ve Kategori Seçimi", expanded=True):
     ana_t = col_a.selectbox("Ana Tema", list(TEKNOFEST_MATRIS[seviye]["Temalar"].keys()))
     alt_t = col_a.selectbox("Alt Tema", TEKNOFEST_MATRIS[seviye]["Temalar"][ana_t])
     h_kitle = col_b.selectbox("Hedef Kitle", TEKNOFEST_MATRIS[seviye]["Hedef_Kitle"])
-    danisman = col_b.text_input("Danışman Adı", placeholder="DANIŞMAN ADI")
+    danisman = col_b.text_input("Danışman Adı", placeholder="HÜSAMETTİN KAYMAKÇI")
 
-# PROJE ADI VE ÖZETİ (Aynı kutuda alt alta - İSTEDİĞİNİZ DÜZEN)
+# PROJE ADI VE ÖZETİ (Aynı kutuda alt alta)
 with st.expander("📝 Proje Detayı ve Yazım Ayarları", expanded=True):
     p_adi_input = st.text_input("Proje Adı", placeholder="Akıllı Projenizin İsmi")
     aciklama = st.text_area("Projenizin Ana Fikrini Yazın (Proje Özeti)", height=150)
-    # 2- Yapay zeka seviyesi - Standart Ai dedektör
     yazim_modu = st.selectbox("Yazım Karakteri", ["Standart AI Dedektör (İnsan Gibi Yaz)", "Akademik/Resmi", "Süper AI"])
 
     if st.button("🚀 Şartnameye Uygun Raporu Hazırla", use_container_width=True, type="primary"):
         if not aciklama or not p_adi_input:
             st.warning("Lütfen Proje Adı ve Açıklamasını doldurun.")
         else:
-            with st.status(f"🛠️ {seviye} Seviyesi Raporu İşleniyor...", expanded=True) as status:
+            with st.status(f"🛠️ {seviye} Seviyesi Analiz Ediliyor...", expanded=True) as status:
                 try:
-                    # --- 404 HATASINI ÇÖZEN KRİTİK AYAR ---
-                    # Paid API'de en stabil ve güncel model yolu
+                    # --- 404 HATASINI ÇÖZEN EN STABİL ÇAĞRI ---
                     genai.configure(api_key=GEMINI_API_KEY)
+                    # Model ismini 'gemini-1.5-flash' olarak sabitledik, bu v1 kanalını kullanır
                     model = genai.GenerativeModel('gemini-1.5-flash')
                     
                     info_dict = {
@@ -123,24 +118,18 @@ with st.expander("📝 Proje Detayı ve Yazım Ayarları", expanded=True):
                     }
 
                     prompt = f"""
-                    Sen bir Teknofest danışmanısın. {seviye} seviyesi için resmi ÖDR yaz.
-                    MOD: {yazim_modu} (Yapay zeka tespitinden kaçınan, insansı ve akademik bir dil kullan).
+                    Sen Teknofest jürisisin. {seviye} seviyesi için resmi ÖDR yaz.
+                    MOD: {yazim_modu} (Yapay zeka tespitinden kaçınan doğal bir dil kullan).
                     Hedef: {hedef_sayfa} sayfa. Tema: {ana_t}/{alt_t}. Hedef Kitle: {h_kitle}.
+                    Puanlama: Özet (20p), Problem (35p), Özgünlük (24p), Yöntem (12p), Takım (6p).
                     ---
-                    PUANLAMA VE BÖLÜMLER (Şartnameye Sadık):
-                    1. PROJE ÖZETİ (20p): {ana_t} uyumu.
-                    2. PROBLEMİN TANIMI VE ÇÖZÜM ÖNERİSİ (35p).
-                    3. ÖZGÜNLÜK VE UYGULANABİLİRLİK (24p).
-                    4. YÖNTEM VE SÜREÇ (12p).
-                    5. PROJE TAKIMI VE KAYNAKLAR (6p).
-                    ---
-                    İçerik Temeli: {aciklama}
+                    İçerik: {aciklama}
                     """
                     response = model.generate_content(prompt)
                     st.session_state.rapor = response.text
                     st.session_state.info = info_dict
                     st.session_state.hazir = True
-                    status.update(label="✅ Rapor Başarıyla Hazırlandı!", state="complete")
+                    status.update(label="✅ Rapor Hazır!", state="complete")
                 except Exception as e:
                     st.error(f"Sistem Pürüzü: {str(e)}")
 
