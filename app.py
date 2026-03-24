@@ -7,6 +7,8 @@ from docx import Document
 from io import BytesIO
 from datetime import datetime
 import urllib.parse
+# Kota hatasını yakalamak için gerekli kütüphane
+from google.api_core import exceptions
 
 # --- 1. GÜVENLİK VE AYARLAR ---
 try:
@@ -95,9 +97,7 @@ with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)", expanded=True):
             with st.status("🛠️ Rapor hazırlanıyor...", expanded=True) as status:
                 try:
                     genai.configure(api_key=GEMINI_API_KEY)
-                    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                    selected_model = next((m for m in available_models if "flash" in m), available_models[0])
-                    model = genai.GenerativeModel(selected_model)
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     
                     hedef_kelime = hedef_sayfa * 450
                     prompt = f"""
@@ -109,7 +109,6 @@ with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)", expanded=True):
                     - Danışman Adı: {danisman_adi}
                     - Takım Adı: {takim_adi}
                     - Takım ID: {takim_id}
-                    - Seviye/Kategori: {seviye} / {kategori}
                     ---
                     İçerik: {proje_adi} - {proje_aciklamasi}. Hikaye: {ozgunluk}
                     """
@@ -118,10 +117,16 @@ with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)", expanded=True):
                     st.session_state.p_adi = proje_adi
                     st.session_state.rapor_hazir = True
                     status.update(label="✅ Rapor Hazır!", state="complete")
-                except Exception as e: st.error(str(e))
+                
+                # --- KOTA HATASI YAKALAMA ---
+                except exceptions.ResourceExhausted:
+                    st.error("⚠️ Günlük 20 giriş kotası dolmuştur.")
+                    status.update(label="❌ Kota Sınırı", state="error")
+                except Exception as e:
+                    st.error(f"Sistemsel pürüz: {str(e)}")
 
-# --- 5. SONUÇ VE İSTATİSTİKLER ---
-if "rapor_hazir" in st.session_state:
+# --- 5. SONUÇ VE ÇIKTILAR ---
+if "rapor_hazir" in st.session_state and st.session_state.rapor_hazir:
     metin = st.session_state.rapor_metni
     p_adi = st.session_state.p_adi
     temiz_metin = metin.replace("**", "").replace("##", "").replace("#", "")
