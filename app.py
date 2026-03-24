@@ -9,12 +9,15 @@ from datetime import datetime
 import urllib.parse
 
 # --- 1. GÜVENLİK VE ANAHTARLAR ---
+# Yeni API Anahtarınız doğrudan tanımlandı
+GEMINI_API_KEY = "AIzaSyBLG5jhEOO44BU_BfIVVSz7L64AAIi7qBs"
+
 try:
-    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+    # Google Sheets için kimlik bilgileri hala secrets (kasa) üzerinden aranıyor
     GOOGLE_CREDS = dict(st.secrets["google_credentials"])
 except:
-    st.error("Secrets (Kasa) ayarları eksik!")
-    st.stop()
+    # Eğer Google Sheets kullanmayacaksanız bu kısım uygulamayı durdurmaz
+    GOOGLE_CREDS = None
 
 # Sayfa Yapılandırması
 st.set_page_config(page_title="TeknoRapor V1 | Derepazarı", layout="centered", page_icon="🤖")
@@ -50,6 +53,8 @@ def create_word(text, title):
     return bio.getvalue()
 
 def connect_sheets():
+    if not GOOGLE_CREDS:
+        return None
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(GOOGLE_CREDS, scope)
@@ -89,26 +94,26 @@ with st.expander("4. 📝 Rapor Girişi (Ana Bölüm)"):
     ozgunluk = st.text_area("Kişisel Dokunuş / Hikaye", height=100)
     
     st.markdown("---")
-    # RENKLİ VE BÜYÜK HAZIRLA BUTONU
     if st.button("🚀 Teknofest Standartlarında Kapsamlı Raporu Hazırla", use_container_width=True, type="primary"):
         if not proje_aciklamasi or not proje_adi:
             st.warning("Lütfen Proje Adı ve Açıklamasını doldurun.")
         else:
             with st.status("🛠️ Raporunuz hazırlanıyor, lütfen bekleyiniz...", expanded=True) as status:
                 st.write("Yapay zeka şu an en derin ve insansı modu kurgulamak için düşünme aşamasında...")
-                st.write(f"Seçilen {hedef_sayfa} sayfa sınırına göre metin optimize ediliyor...")
                 
                 try:
                     genai.configure(api_key=GEMINI_API_KEY)
-                    models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                    model = genai.GenerativeModel(next((m for m in models if "flash" in m), models[0]))
+                    # Model seçimi (flash modeli tercih edilir)
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     
                     hedef_kelime = hedef_sayfa * 450
                     prompt = f"""
-                    Sen Teknofest danışmanısın. {seviye} seviyesi için {kategori} kategorisinde TAM {hedef_sayfa} SAYFA (Yaklaşık {hedef_kelime} kelime) rapor yaz.
+                    Sen Teknofest danışmanısın.
+                    {seviye} seviyesi için {kategori} kategorisinde TAM {hedef_sayfa} SAYFA (Yaklaşık {hedef_kelime} kelime) rapor yaz.
                     MOD: {yazim_modu} (Anti-Dedektör ise burstiness ve perplexity değerlerini yükselt, insansı yaz).
                     BÖLÜMLER: Özet, Problem, Çözüm, Özgün Değer, Hedef Kitle, Maliyet, Takvim.
-                    İçerik: {proje_adi} - {proje_aciklamasi}. Hikaye: {ozgunluk}
+                    İçerik: {proje_adi} - {proje_aciklamasi}.
+                    Hikaye: {ozgunluk}
                     """
                     
                     response = model.generate_content(prompt)
@@ -124,7 +129,6 @@ if "rapor_hazir" in st.session_state and st.session_state.rapor_hazir:
     metin = st.session_state.rapor_metni
     k_sayisi = len(metin.split())
     
-    # İstatistikler
     col_st1, col_st2, col_st3 = st.columns(3)
     col_st1.metric("Toplam Kelime", k_sayisi)
     col_st2.metric("Savunma Durumu", "Aktif" if "Anti-Dedektör" in yazim_modu else "Pasif")
@@ -132,7 +136,6 @@ if "rapor_hazir" in st.session_state and st.session_state.rapor_hazir:
     
     st.text_area("Rapor Önizleme", metin, height=300)
     
-    # İndirme ve E-posta Düğmeleri
     st.markdown("### 📥 Dosya İşlemleri")
     c_down1, c_down2, c_down3 = st.columns(3)
     
@@ -145,12 +148,7 @@ if "rapor_hazir" in st.session_state and st.session_state.rapor_hazir:
     with c_down3:
         st.button("🖨️ Raporu Yazdır", on_click=lambda: st.info("PDF olarak indirip Ctrl+P ile yazdırabilirsiniz. A4 formatı tam uyumludur."), use_container_width=True)
 
-    # E-posta Gönderme
-    email_user = st.text_input("📩 Raporu E-Postana Gönder", placeholder="E-posta adresinizi yazın...")
-    if st.button("E-Posta Gönder"):
-        st.success(f"Rapor taslağı {email_user} adresine e-posta olarak gönderilmek üzere sıraya alındı.")
-
-# --- 6. SİSTEM DÜĞMELERİ (YENİ VE PAYLAŞ) ---
+# --- 6. SİSTEM DÜĞMELERİ ---
 st.markdown("---")
 c_sys1, c_sys2 = st.columns(2)
 with c_sys1:
@@ -167,7 +165,7 @@ st.markdown(f"""
 <p style='text-align: center; color: gray; font-size: 0.9em;'>
     Derepazarı İlçe MEM Arge Birimi © 2026<br>
     <b>Hazırlayan: Hüsamettin KAYMAKÇI</b><br>
-    E-Posta: <a href='mailto:sosyalcinet@gmail.com'>sosyalcinet@gmail.com</a> | 
+    E-Posta: <a href='mailto:sosyalcinet@gmail.com'>sosyalcinet@gmail.com</a> |
     Telegram: <a href='https://t.me/sosyalcinet'>@sosyalcinet</a>
 </p>
 """, unsafe_allow_html=True)
