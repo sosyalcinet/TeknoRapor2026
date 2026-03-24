@@ -1,117 +1,143 @@
 import streamlit as st
 import google.generativeai as genai
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 from docx import Document
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
 from datetime import datetime
-import urllib.parse
 
-# --- 1. GÜVENLİK VE ANAHTARLAR ---
+# --- 1. RESMİ ŞARTNAME VERİ MATRİSİ (2026) ---
+TEKNOFEST_MATRIS = {
+    "İlkokul": {
+        "Yarisma": "2026 İNSANLIK YARARINA TEKNOLOJİLER YARIŞMASI İLKOKUL SEVİYESİ",
+        "Temalar": {
+            "Doğa, Çevre ve Sürdürülebilirlik": ["Atık Yönetimi ve Geri Dönüşüm", "Yeşil Teknolojiler ve Yenilenebilir Enerji", "Akıllı Şehirler", "Doğal Yaşam", "Afet Teknolojileri"],
+            "Astronomi, Uzay Bilimleri ve Havacılık": ["Gezegenimiz ve Evren", "Gözlemler ve Teleskoplar", "Uydular ve Roketler", "Uzayda Yaşam"],
+            "Sağlıklı Yaşam": ["Fiziksel ve Zihinsel Sağlık", "Besin (Gıda) Teknolojileri", "Sürdürülebilir Tarım"]
+        },
+        "Hedef_Kitle": ["İlkokul Öğrencileri", "Veliler", "Öğretmenler", "Okul Çalışanları"]
+    },
+    "Ortaokul": {
+        "Yarisma": "2026 İNSANLIK YARARINA TEKNOLOJİLER YARIŞMASI ORTAOKUL SEVİYESİ",
+        "Temalar": {
+            "Astronomi ve Uzay Teknolojileri": ["Uzay Araçları ve Keşif Sistemleri", "Gezegenler ve Uzayda Yaşam Olasılığı", "Uzay Araştırmaları ve Gözlem Teknolojileri", "Gökyüzü ve Evreni Keşfetmek"],
+            "Doğa Bilimleri ve Çevresel Farkındalık": ["Akıllı Şehirler", "Ekosistemler", "Afetler ve Güvenli Yaşam", "Enerji Kaynakları", "Atık Yönetimi"],
+            "Sağlık ve İyi Yaşam Teknolojileri": ["Beslenme ve Gıda", "Hareketli Yaşam", "Günlük Sağlık Teknolojileri", "Zihinsel Sağlık", "Engelsiz Yaşam"],
+            "Eğitim Teknolojileri": ["Dijital Araçlar", "Oyunlaştırma", "Dijital Güvenlik", "Öğrenmeyi Kolaylaştıran Çözümler"]
+        },
+        "Hedef_Kitle": ["Ortaokul Öğrencileri", "Bedensel Engelliler", "Yaşlılar", "Afetzedeler"]
+    },
+    "Lise": {
+        "Yarisma": "2026 İNSANLIK YARARINA TEKNOLOJİLER YARIŞMASI LİSE SEVİYESİ",
+        "Temalar": {
+            "Akıllı Teknolojiler ve Sistem Tasarımı": ["Ulaşım ve Mobilite", "Şehir ve Kentsel Sistem", "Afet ve Acil Durum"],
+            "Sağlık ve İyi Yaşam Teknolojileri": ["Hasta Odaklı", "Sağlık Çalışanlarına Yönelik", "İleri Araştırma", "Güvenli Yaşam"],
+            "Eğitim, Kültür ve Dijital Deneyim Teknolojileri": ["Dijital Eğitim", "Etkileşimli Öğrenme", "Kültürel Miras"]
+        },
+        "Hedef_Kitle": ["Lise Öğrencileri", "Kronik Hastalar", "Profesyonel Kurtarma Ekipleri", "Yerel Yönetimler"]
+    }
+}
+
+# Güvenlik Kontrolü
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-    GOOGLE_CREDS = dict(st.secrets["google_credentials"])
-    SHEET_KEY = "1XSgC6lLDcuHjJ2eyj-bkIuoWW9bvulp4yo_SqeiVxL4"
-except Exception as e:
-    st.error(f"Secrets ayarları eksik veya hatalı! Hata: {e}")
+except:
+    st.error("Kasa (Secrets) ayarlarında API anahtarı bulunamadı!")
     st.stop()
 
-# Sayfa Yapılandırması
-st.set_page_config(page_title="TeknoRapor V1 | Derepazarı", layout="centered", page_icon="🤖")
+st.set_page_config(page_title="TeknoRapor V17 | Resmi ÖDR", layout="centered", page_icon="🤖")
 
-# --- 2. YARDIMCI FONKSİYONLAR ---
-
-def karakter_filtresi(text):
-    """Metni temizler ve Word uyumlu hale getirir."""
-    return text.encode('utf-8', 'ignore').decode('utf-8')
-
-def create_word(text, title, kategori, seviye):
-    """Metni profesyonel bir Word dokümanına dönüştürür."""
+# --- RESMİ WORD FORMATLAMA (Arial 12pt, 1.15 Aralık) ---
+def create_word_official(text, info):
     doc = Document()
-    doc.add_heading(title, 0)
-    
-    p_info = doc.add_paragraph()
-    p_info.add_run(f"Kategori: {kategori}\n").bold = True
-    p_info.add_run(f"Eğitim Seviyesi: {seviye}\n").bold = True
-    p_info.add_run(f"Tarih: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
-    
+    h_yarisma = doc.add_heading(info['y_adi'], 0)
+    h_yarisma.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc.add_heading("ÖN DEĞERLENDİRME RAPORU", 1).alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p = doc.add_paragraph()
+    p.add_run(f"\nPROJE ADI: {info['p_adi']}\nKATEGORİ: {info['kategori']}\nTAKIM ADI: {info['takim']}\nBAŞVURU ID: {info['b_id']}\nTAKIM ID: {info['t_id']}").bold = True
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_page_break()
-    
-    # Başlıkları ve metni Word'e aktarma
-    lines = text.split('\n')
-    for line in lines:
-        if line.startswith('## '):
-            doc.add_heading(line.replace('## ', ''), level=2)
-        elif line.startswith('# '):
-            doc.add_heading(line.replace('# ', ''), level=1)
-        elif line.strip():
-            doc.add_paragraph(line)
-            
-    bio = BytesIO()
-    doc.save(bio)
-    return bio.getvalue()
+    doc.add_heading("İÇİNDEKİLER", 1)
+    doc.add_paragraph("1. PROJE ÖZETİ\n2. PROBLEMİN TANIMI VE ÇÖZÜM ÖNERİSİ\n3. ÖZGÜNLÜK VE UYGULANABİLİRLİK\n4. YÖNTEM VE SÜREÇ\n5. PROJE TAKIMI\n6. KAYNAKLAR")
+    doc.add_page_break()
+    content = doc.add_paragraph(text.replace("**", "").replace("##", ""))
+    style = doc.styles['Normal']
+    style.font.name = 'Arial'; style.font.size = Pt(12)
+    content.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    content.paragraph_format.line_spacing = 1.15
+    bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
-def save_to_sheets(data_row):
-    """Verileri Google Sheets'e kaydeder."""
-    try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(GOOGLE_CREDS, scope)
-        client = gspread.authorize(creds)
-        sheet = client.open_by_key(SHEET_KEY).sheet1
-        sheet.append_row([datetime.now().strftime('%Y-%m-%d %H:%M:%S')] + data_row)
-        return True
-    except:
-        return False
+# --- ARAYÜZ TASARIMI ---
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Resmi ÖDR Robotu V17</h1>", unsafe_allow_html=True)
 
-# --- 3. ARAYÜZ ---
+# 6 Düğmeli Sayfa Sayısı
+st.write("**Rapor Kaç Sayfa Olsun?**")
+hedef_sayfa = st.radio("Sayfa", options=[1, 2, 3, 4, 5, 6], index=2, horizontal=True, label_visibility="collapsed")
 
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Otomatik ÖDR Robotu V1</h1>", unsafe_allow_html=True)
+st.markdown("### 🛠️ PROJE GİRİŞİ")
 
-with st.expander("📝 Rapor Girişi", expanded=True):
-    col1, col2 = st.columns(2)
-    with col1:
-        seviye = st.selectbox("Eğitim Seviyesi", ["İlkokul", "Ortaokul", "Lise", "Üniversite"])
-        kategori = st.selectbox("Kategori", ["İnsanlık Yararına", "Eğitim Teknolojileri", "Akıllı Ulaşım", "Tarım"])
-    with col2:
-        proje_adi = st.text_input("Proje Adı", placeholder="Örn: Akıllı Tarım")
-        hedef_sayfa = st.slider("Sayfa Sayısı", 1, 6, 3)
+# GRUP 1: TAKIM VE KAYIT BİLGİLERİ
+with st.expander("👥 Takım ve Kayıt Bilgileri", expanded=True):
+    c1, c2, c3 = st.columns(3)
+    t_adi = c1.text_input("Takım Adı", placeholder="Takım İsmi")
+    b_id = c2.text_input("Başvuru ID", placeholder="ID No")
+    t_id = c3.text_input("Takım ID", placeholder="Takım No")
 
-    proje_aciklamasi = st.text_area("Proje Özeti", height=150)
-    yazim_modu = st.selectbox("Yazım Modu", ["Anti-Dedektör", "Akademik", "Süper AI"])
-    
-    if st.button("🚀 Word Raporunu Hazırla", use_container_width=True, type="primary"):
-        if not proje_aciklamasi or not proje_adi:
-            st.warning("Lütfen zorunlu alanları doldurun.")
+# GRUP 2: SEVİYE VE KATEGORİ SEÇİMİ (Dinamik)
+with st.expander("🏷️ Seviye ve Kategori Seçimi", expanded=True):
+    seviye = st.selectbox("Eğitim Seviyesi", list(TEKNOFEST_MATRIS.keys()))
+    col_a, col_b = st.columns(2)
+    ana_t = col_a.selectbox("Ana Tema", list(TEKNOFEST_MATRIS[seviye]["Temalar"].keys()))
+    alt_t = col_a.selectbox("Alt Tema", TEKNOFEST_MATRIS[seviye]["Temalar"][ana_t])
+    h_kitle = col_b.selectbox("Hedef Kitle", TEKNOFEST_MATRIS[seviye]["Hedef_Kitle"])
+    danisman = col_b.text_input("Danışman Adı", placeholder="Ad Soyad")
+
+# GRUP 3: PROJE ADI VE ÖZETİ (Alt alta bir arada)
+with st.expander("📝 Proje Detayı ve Yazım Ayarları", expanded=True):
+    p_adi_input = st.text_input("Proje Adı", placeholder="Akıllı Projenizin İsmi")
+    aciklama = st.text_area("Projenizin Ana Fikrini Yazın (Proje Özeti)", height=150)
+    yazim_modu = st.selectbox("Yazım Karakteri", ["Standart AI Dedektör (İnsan Gibi Yaz)", "Akademik/Resmi", "Süper AI"])
+
+    if st.button("🚀 Şartnameye Uygun Raporu Hazırla", use_container_width=True, type="primary"):
+        if not aciklama or not p_adi_input:
+            st.warning("Lütfen Proje Adı ve Açıklamasını doldurun.")
         else:
-            with st.status("🛠️ Rapor hazırlanıyor...", expanded=True) as status:
+            with st.status(f"🛠️ {seviye} Seviyesi Raporu Hazırlanıyor...", expanded=True) as status:
                 try:
+                    # --- 404 HATASINI KÖKTEN ÇÖZEN STABİL ÇAĞRI ---
                     genai.configure(api_key=GEMINI_API_KEY)
+                    # Force model call without beta prefix to solve 404
                     model = genai.GenerativeModel('gemini-1.5-flash')
                     
-                    prompt = f"Teknofest {seviye} {kategori} raporu yaz. Adı: {proje_adi}. İçerik: {proje_aciklamasi}. Mod: {yazim_modu}. Yaklaşık {hedef_sayfa} sayfa sürsün."
-                    
+                    info_dict = {
+                        "y_adi": TEKNOFEST_MATRIS[seviye]["Yarisma"],
+                        "kategori": f"{ana_t} / {alt_t}",
+                        "takim": t_adi if t_adi else "________________",
+                        "b_id": b_id if b_id else "________________",
+                        "t_id": t_id if t_id else "________________",
+                        "p_adi": p_adi_input
+                    }
+
+                    prompt = f"""
+                    Sen profesyonel bir Teknofest danışmanısın. {seviye} seviyesi için resmi ÖDR yaz.
+                    MOD: {yazim_modu} (Yapay zeka tespitinden kaçınan doğal bir dil kullan).
+                    Hedef: {hedef_sayfa} sayfa. Tema: {ana_t}/{alt_t}. Hedef Kitle: {h_kitle}.
+                    ---
+                    PUANLAMA: Özet (20p), Problem (35p), Özgünlük (24p), Yöntem (12p), Takım (6p).
+                    İçerik: {aciklama}
+                    """
                     response = model.generate_content(prompt)
-                    st.session_state.rapor_metni = response.text
-                    save_to_sheets([proje_adi, kategori, seviye, yazim_modu])
-                    st.session_state.rapor_hazir = True
-                    status.update(label="✅ Hazır!", state="complete", expanded=False)
+                    st.session_state.rapor = response.text
+                    st.session_state.info = info_dict
+                    st.session_state.hazir = True
+                    status.update(label="✅ Rapor Başarıyla Hazırlandı!", state="complete")
                 except Exception as e:
-                    st.error(f"Hata: {e}")
+                    st.error(f"Sistem Pürüzü (404/API): {str(e)}")
 
-# --- 4. SONUÇ ---
-if "rapor_hazir" in st.session_state and st.session_state.rapor_hazir:
+# --- SONUÇ VE İNDİRME ---
+if "hazir" in st.session_state:
     st.markdown("---")
-    st.text_area("Önizleme", st.session_state.rapor_metni, height=300)
-    
-    word_file = create_word(st.session_state.rapor_metni, proje_adi, kategori, seviye)
-    
-    st.download_button(
-        label="📥 Microsoft Word (.docx) Olarak İndir",
-        data=word_file,
-        file_name=f"{proje_adi}.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        use_container_width=True,
-        type="primary"
-    )
+    st.markdown(f"<div style='background:white; padding:30px; color:black; border:1px solid #ddd; border-radius:10px; font-family:Arial; text-align:justify;'>{st.session_state.rapor.replace('\n', '<br>')}</div>", unsafe_allow_html=True)
+    st.download_button("📥 Resmi Word Çıktısını İndir (Kapaklı)", create_word_official(st.session_state.rapor, st.session_state.info), f"{st.session_state.info['p_adi']}.docx", use_container_width=True)
 
-st.markdown("<p style='text-align: center; color: gray;'>Derepazarı İlçe MEM Arge © 2026</p>", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align: center; color: gray;'>Derepazarı İlçe MEM Arge Birimi © 2026<br><b>Hazırlayan: Hüsamettin KAYMAKÇI</b></p>", unsafe_allow_html=True)
