@@ -6,7 +6,7 @@ st.set_page_config(page_title="TeknoRapor | Bilgilendirme", page_icon="🚫")
 # Karşılama Mesajı
 st.markdown(f"""
     <div style="text-align: center; padding: 100px 20px;">
-        <h1 style="color: #1E3A8A; font-family: Arial;">🤖 TeknoRapor V1</h1>
+        <h1 style="color: #1E3A8A; font-family: Arial;">🤖 TeknoRapor V53</h1>
         <hr style="border: 1px solid #eee;">
         <br>
         <h2 style="color: #D32F2F; font-family: Arial;">Sistem yoğunluğu nedeniyle kapanmıştır.</h2>
