@@ -2,4 +2,5 @@ streamlit
 google-generativeai
 gspread
 oauth2client
-fpdf2
+fpdf
+python-docx
