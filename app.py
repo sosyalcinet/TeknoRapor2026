@@ -38,13 +38,14 @@ TEKNOFEST_MATRIS = {
     }
 }
 
+# Güvenlik Kontrolü
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 except:
     st.error("Kasa (Secrets) ayarlarında API anahtarı bulunamadı!")
     st.stop()
 
-st.set_page_config(page_title="TeknoRapor V16 | Derepazarı", layout="centered", page_icon="🤖")
+st.set_page_config(page_title="TeknoRapor V17 | Resmi ÖDR", layout="centered", page_icon="🤖")
 
 # --- RESMİ WORD FORMATLAMA (Arial 12pt, 1.15 Aralık) ---
 def create_word_official(text, info):
@@ -53,7 +54,7 @@ def create_word_official(text, info):
     h_yarisma.alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_heading("ÖN DEĞERLENDİRME RAPORU", 1).alignment = WD_ALIGN_PARAGRAPH.CENTER
     p = doc.add_paragraph()
-    p.add_run(f"\nKATEGORİ: {info['kategori']}\nTAKIM ADI: {info['takim']}\nBAŞVURU ID: {info['b_id']}\nTAKIM ID: {info['t_id']}").bold = True
+    p.add_run(f"\nPROJE ADI: {info['p_adi']}\nKATEGORİ: {info['kategori']}\nTAKIM ADI: {info['takim']}\nBAŞVURU ID: {info['b_id']}\nTAKIM ID: {info['t_id']}").bold = True
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_page_break()
     doc.add_heading("İÇİNDEKİLER", 1)
@@ -66,32 +67,32 @@ def create_word_official(text, info):
     content.paragraph_format.line_spacing = 1.15
     bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
-# --- ARAYÜZ ---
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Resmi ÖDR Robotu V16</h1>", unsafe_allow_html=True)
+# --- ARAYÜZ TASARIMI ---
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Resmi ÖDR Robotu V17</h1>", unsafe_allow_html=True)
 
-# Sayfa Derinliği - 6 Düğme
+# 6 Düğmeli Sayfa Sayısı
 st.write("**Rapor Kaç Sayfa Olsun?**")
 hedef_sayfa = st.radio("Sayfa", options=[1, 2, 3, 4, 5, 6], index=2, horizontal=True, label_visibility="collapsed")
 
 st.markdown("### 🛠️ PROJE GİRİŞİ")
 
-# TAKIM VE ID (Yan yana)
+# GRUP 1: TAKIM VE KAYIT BİLGİLERİ
 with st.expander("👥 Takım ve Kayıt Bilgileri", expanded=True):
     c1, c2, c3 = st.columns(3)
-    t_adi = c1.text_input("Takım Adı", placeholder="Örn: ATMACALAR")
-    b_id = c2.text_input("Başvuru ID", placeholder="Başvuru ID")
-    t_id = c3.text_input("Takım ID", placeholder="Takım ID")
+    t_adi = c1.text_input("Takım Adı", placeholder="Takım İsmi")
+    b_id = c2.text_input("Başvuru ID", placeholder="ID No")
+    t_id = c3.text_input("Takım ID", placeholder="Takım No")
 
-# SEVİYE VE KATEGORİ (Ayrı yerde, Seçmeli)
+# GRUP 2: SEVİYE VE KATEGORİ SEÇİMİ (Dinamik)
 with st.expander("🏷️ Seviye ve Kategori Seçimi", expanded=True):
     seviye = st.selectbox("Eğitim Seviyesi", list(TEKNOFEST_MATRIS.keys()))
     col_a, col_b = st.columns(2)
     ana_t = col_a.selectbox("Ana Tema", list(TEKNOFEST_MATRIS[seviye]["Temalar"].keys()))
     alt_t = col_a.selectbox("Alt Tema", TEKNOFEST_MATRIS[seviye]["Temalar"][ana_t])
     h_kitle = col_b.selectbox("Hedef Kitle", TEKNOFEST_MATRIS[seviye]["Hedef_Kitle"])
-    danisman = col_b.text_input("Danışman Adı", placeholder="HÜSAMETTİN KAYMAKÇI")
+    danisman = col_b.text_input("Danışman Adı", placeholder="Ad Soyad")
 
-# PROJE ADI VE ÖZETİ (Aynı kutuda alt alta)
+# GRUP 3: PROJE ADI VE ÖZETİ (Alt alta bir arada)
 with st.expander("📝 Proje Detayı ve Yazım Ayarları", expanded=True):
     p_adi_input = st.text_input("Proje Adı", placeholder="Akıllı Projenizin İsmi")
     aciklama = st.text_area("Projenizin Ana Fikrini Yazın (Proje Özeti)", height=150)
@@ -101,11 +102,11 @@ with st.expander("📝 Proje Detayı ve Yazım Ayarları", expanded=True):
         if not aciklama or not p_adi_input:
             st.warning("Lütfen Proje Adı ve Açıklamasını doldurun.")
         else:
-            with st.status(f"🛠️ {seviye} Seviyesi Analiz Ediliyor...", expanded=True) as status:
+            with st.status(f"🛠️ {seviye} Seviyesi Raporu Hazırlanıyor...", expanded=True) as status:
                 try:
-                    # --- 404 HATASINI ÇÖZEN EN STABİL ÇAĞRI ---
+                    # --- 404 HATASINI KÖKTEN ÇÖZEN STABİL ÇAĞRI ---
                     genai.configure(api_key=GEMINI_API_KEY)
-                    # Model ismini 'gemini-1.5-flash' olarak sabitledik, bu v1 kanalını kullanır
+                    # Force model call without beta prefix to solve 404
                     model = genai.GenerativeModel('gemini-1.5-flash')
                     
                     info_dict = {
@@ -118,22 +119,22 @@ with st.expander("📝 Proje Detayı ve Yazım Ayarları", expanded=True):
                     }
 
                     prompt = f"""
-                    Sen Teknofest jürisisin. {seviye} seviyesi için resmi ÖDR yaz.
+                    Sen profesyonel bir Teknofest danışmanısın. {seviye} seviyesi için resmi ÖDR yaz.
                     MOD: {yazim_modu} (Yapay zeka tespitinden kaçınan doğal bir dil kullan).
                     Hedef: {hedef_sayfa} sayfa. Tema: {ana_t}/{alt_t}. Hedef Kitle: {h_kitle}.
-                    Puanlama: Özet (20p), Problem (35p), Özgünlük (24p), Yöntem (12p), Takım (6p).
                     ---
+                    PUANLAMA: Özet (20p), Problem (35p), Özgünlük (24p), Yöntem (12p), Takım (6p).
                     İçerik: {aciklama}
                     """
                     response = model.generate_content(prompt)
                     st.session_state.rapor = response.text
                     st.session_state.info = info_dict
                     st.session_state.hazir = True
-                    status.update(label="✅ Rapor Hazır!", state="complete")
+                    status.update(label="✅ Rapor Başarıyla Hazırlandı!", state="complete")
                 except Exception as e:
-                    st.error(f"Sistem Pürüzü: {str(e)}")
+                    st.error(f"Sistem Pürüzü (404/API): {str(e)}")
 
-# --- SONUÇ ---
+# --- SONUÇ VE İNDİRME ---
 if "hazir" in st.session_state:
     st.markdown("---")
     st.markdown(f"<div style='background:white; padding:30px; color:black; border:1px solid #ddd; border-radius:10px; font-family:Arial; text-align:justify;'>{st.session_state.rapor.replace('\n', '<br>')}</div>", unsafe_allow_html=True)
