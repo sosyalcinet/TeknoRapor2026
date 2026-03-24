@@ -17,7 +17,7 @@ except:
     st.error("Kasa (Secrets) ayarları bulunamadı!")
     st.stop()
 
-st.set_page_config(page_title="TeknoRapor V2 | Resmi Şablon", layout="centered", page_icon="🤖")
+st.set_page_config(page_title="TeknoRapor V3 | Resmi Şablon", layout="centered", page_icon="🤖")
 
 # --- KARAKTER FİLTRESİ ---
 def format_temizle(text):
@@ -29,9 +29,7 @@ def format_temizle(text):
 # --- WORD FORMATLAMA (Resmi Kurallar: Arial 12pt, 1.15 Aralığı) ---
 def create_word(text, title):
     doc = Document()
-    # Başlık Arial Black, 14 punto
     h = doc.add_heading(title.upper(), 0)
-    # İçerik
     temiz_word = text.replace("**", "").replace("##", "").replace("#", "")
     p = doc.add_paragraph(temiz_word)
     style = doc.styles['Normal']
@@ -39,7 +37,6 @@ def create_word(text, title):
     font.name = 'Arial'
     font.size = Pt(12)
     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    # Satır aralığı 1.15
     p.paragraph_format.line_spacing = 1.15
     bio = BytesIO()
     doc.save(bio)
@@ -56,23 +53,26 @@ def create_pdf(text, title):
     return pdf.output(dest='S').encode('latin-1')
 
 # --- ARAYÜZ ---
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Resmi ÖDR Robotu V2</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Teknofest Resmi ÖDR Robotu V3</h1>", unsafe_allow_html=True)
 
 with st.expander("⚙️ Rapor Derinliği (Sayı Düğmeleri)", expanded=True):
     hedef_sayfa = st.radio("Hedef Sayfa Sayısı", options=[1, 2, 3, 4, 5, 6], index=2, horizontal=True)
 
-with st.expander("📝 Proje ve Takım Bilgileri (İsteğe Bağlı)", expanded=True):
+with st.expander("📝 Proje Bilgileri (Resmi Şablona Göre)", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
         seviye = st.selectbox("Eğitim Seviyesi", ["İlkokul", "Ortaokul", "Lise"])
-        proje_adi = st.text_input("Proje Adı", placeholder="Boş bırakılırsa alan ayrılır")
+        proje_adi = st.text_input("Proje Adı", placeholder="Bulut Kumbarası")
         kategori = st.selectbox("Kategori", ["İnsanlık Yararına Teknoloji", "Eğitim Teknolojileri", "Akıllı Ulaşım"])
+        ana_tema = st.text_input("Ana / Alt Tema Uyumu", placeholder="Örn: Sosyal İnovasyon")
     with col2:
         danisman = st.text_input("Danışman Adı")
         takim = st.text_input("Takım Adı")
         takim_id = st.text_input("Başvuru/Takım ID")
+        hedef_kitle = st.text_input("Hedef Kitle", placeholder="Örn: Yaşlılar, Öğrenciler")
 
-    aciklama = st.text_area("Proje Özeti (Fikrinizi buraya yazın)", height=150)
+    aciklama = st.text_area("Proje Özeti ve Kapsamı (Fikrinizi buraya yazın)", height=150)
+    problem_tanimi = st.text_area("Problemin Tanımı ve Önemi (Boş bırakılabilir)", height=100)
     
     if st.button("🚀 Resmi Şablona Göre Çıktı Hazırla", use_container_width=True, type="primary"):
         if not aciklama:
@@ -81,34 +81,36 @@ with st.expander("📝 Proje ve Takım Bilgileri (İsteğe Bağlı)", expanded=T
             with st.status("🛠️ Resmi kriterler inceleniyor...", expanded=True) as status:
                 try:
                     genai.configure(api_key=GEMINI_API_KEY)
-                    # 404 HATASINI ÇÖZEN SABİTLENMİŞ MODEL İSMİ
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    # 404 HATASINI ÇÖZEN GÜNCELLENMİŞ MODEL ÇAĞRISI
+                    model = genai.GenerativeModel('gemini-1.5-flash-latest')
                     
-                    # Eksik verileri yönetme mantığı
+                    # Eksik verileri yönetme (Boşsa ibare ekleme)
                     p_adi = proje_adi if proje_adi else "[BURAYA PROJE ADINI YAZINIZ]"
                     d_adi = danisman if danisman else "[BURAYA DANIŞMAN ADINI YAZINIZ]"
                     t_adi = takim if takim else "[BURAYA TAKIM ADINI YAZINIZ]"
                     t_id = takim_id if takim_id else "[BURAYA ID YAZINIZ]"
+                    h_kitle = hedef_kitle if hedef_kitle else "[BURAYA HEDEF KİTLEYİ YAZINIZ]"
+                    tema = ana_tema if ana_tema else "[BURAYA TEMA UYUMUNU YAZINIZ]"
 
                     prompt = f"""
                     Sen bir Teknofest danışmanısın. {seviye} seviyesi {kategori} şablonuna göre {hedef_sayfa} sayfalık rapor yaz.
-                    Markdown (**, #) kullanma.
+                    Sayfa Yapısı: Arial 12pt, 1.15 satır aralığı mantığında. Markdown kullanma.
                     
-                    BAŞLANGIÇ BİLGİLERİ (BOLD):
+                    ZORUNLU RESMİ BÖLÜMLER VE PUANLAMA (Bu bölümleri mutlaka kullan):
+                    1. PROJE ÖZETİ (20 PUAN): Amacı, ana fikri ({tema}), hedef kitlesi ({h_kitle}) ve çözüm yaklaşımı. (150-250 kelime)
+                    2. PROBLEMİN TANIMI VE ÇÖZÜM ÖNERİSİ (35 PUAN): Problemin önemi ve çözümün temel işleyiş mantığı.
+                    3. ÖZGÜN DEĞER, UYGULANABİLİRLİK VE SÜRDÜRÜLEBİLİRLİK (24 PUAN): Projenin farklılığı ve geleceği.
+                    4. PROJENİN HAZIRLANIŞ SÜRECİ VE ÇALIŞMA YÖNTEMİ (12 PUAN).
+                    5. PROJE TAKIMI (3 PUAN): Görev dağılımı tablosu anlatımı.
+                    6. KAYNAKLAR (3 PUAN).
+                    
+                    BAŞLANGIÇ BİLGİLERİ (EN BAŞA EKLE):
                     PROJE ADI: {p_adi}
                     DANIŞMAN: {d_adi}
                     TAKIM: {t_adi}
                     ID: {t_id}
                     ---
-                    Aşağıdaki bölümleri puanlama kriterlerine göre (Özet 20p, Problem 35p, Özgünlük 24p, Yöntem 12p, Takım 3p, Kaynaklar 3p) detaylandır:
-                    1. PROJE ÖZETİ
-                    2. PROBLEMİN TANIMI VE ÇÖZÜM ÖNERİSİ
-                    3. ÖZGÜNLÜK, UYGULANABİLİRLİK VE SÜRDÜRÜLEBİLİRLİK
-                    4. PROJENİN HAZIRLANIŞ SÜRECİ VE ÇALIŞMA YÖNTEMİ
-                    5. PROJE TAKIMI (Tablo yapısı anlatımı)
-                    6. KAYNAKLAR
-                    
-                    İçerik Temeli: {aciklama}
+                    İçerik Temeli: {aciklama}. Ek Sorun Tanımı: {problem_tanimi}
                     """
                     response = model.generate_content(prompt)
                     st.session_state.rapor = response.text
